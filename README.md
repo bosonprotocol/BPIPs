@@ -9,4 +9,5 @@ Boson Protocol Improvement Proposals offer a path for contributing to Boson Prot
 * smart contracts layer
 * SDK and widgets
 * and parameters of the protocol itself.
+
 As these are vastly different changes, the process for each is a bit different. Last but not least, check our Grants page for funding your project at: https://www.bosonprotocol.io/build/
