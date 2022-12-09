@@ -7,9 +7,9 @@ created: 2022-11-19
 ---
 
 ## Abstract
-This specifies the process and provides guidelines for coordinating changes in Boson Protocol as an open source project. It follows heavily similar open source styles, such as PEP, BIP and EIP. 
+This specifies the process and provides guidelines for coordinating changes in Boson Protocol as an open source project. It follows similar open source styles, such as [PEPs](https://peps.python.org/), [BIP](https://github.com/bitcoin/bips) and [EIPs](https://eips.ethereum.org/). 
 
-Proposals may range from technical changes and new features in smart contracts, modifying the protocol parameters, as well as its surrounding SDK. Before implementation of the changes, polling the community via public voting is preferred.
+Proposals may range from technical changes and new features in smart contracts, modifying the protocol parameters, as well as its surrounding SDK. Before the implementation of the changes, polling the community via public voting is preferred.
 
 ## Motivation
 BPIPs are intended to be the primary mechanism for proposing, tracking and discussing changes to Boson Protocol.
@@ -50,13 +50,13 @@ The poll happens after Last Call deadline passes, then can move to Final or With
 ### BPIP Template
 Use BPIP-1 as a template for new proposals. The template mimics that of Ethereum. 
 
-Preamble should contain:
+**Preamble** should contain:
 
 |bpip number|title|author|discussions-to|status|created date|requires|
 
-Discussions are preferred to be kept within this Github repository.
+**Discussions** are preferred to be kept within this Github repository.
 
-The preample must be followed by these sections:
+The preample must be followed by the **main section**:
 * Abstract - A concise description of the proposal.
 * Motivation - Describing motivation behind a BPIP is crucial in order to understand why a proposal is needed and the project can't cover this need as-is.
 * Specification - Technical specification describes the proposed changes in a sufficient detailed that can be used as basis for in-depth discussion and later implementation. This section must also include the type of the proposal.
