@@ -17,15 +17,15 @@ BPIPs are intended to be the primary mechanism for proposing, tracking and discu
 ## Specification (including type/scope)
 Each BPIP must contain three main parts: the preamble, the main section including the specification with a defined type of the proposal, and a discussion.
 
-### Types of BPIPs
+#### Types of BPIPs
 * protocol - change of smart contracts layer
 * core components - change of core components layer, SDK, 
 * configuration - change of parameters’ values of deployed protocol
 
-### Process
+#### Process
 BPIP process has three stages:
-1. submitting a proposal and passing it through statuses
-2. community voting on go/no-go, optional, but preferred
+1. submitting a proposal and passing it through its lifecycle
+2. community voting on go/no-go via Snapshot, which is optional, but preferred
 3. implementation
 
 To submit a BPIP and see it through, please follow these steps:
@@ -33,21 +33,21 @@ To submit a BPIP and see it through, please follow these steps:
 2. create a new bpip file in `/content/` directory, by following the guidelines in BPIP-1
 3. submit a Pull Request to the `main` branch
 
-### BPIP editors
+#### BPIP editors
 BPIP editors will pick up new proposals, check the syntax, do sanity checks and work with the authors and other participants to move the proposals through their lifecycle. If the proposal reaches the `Final` status, then they will evaluate if the actual implementation of the BPIP should pass the community [vote via Snapshot](https://snapshot.org/#/bosondao.eth). The list of editors can later be changed via Boson DAO.
 
 BPIP editors meet on ad hoc basis to discuss and action on the backlog of BPIPs. A high quorum is required of 4/5, while voting decisions require 2/3 supermajority. Meeting minutes are recorded in a [public log](./content/BPIP-editors-call-log.md).
 
-Note that smart contract might have (multi-sig) admin/upgrader roles assigned that may or may not be the same as these editors.
+> Note that smart contracts might have assigned admin/upgrader roles that may or may not be the same as these editors.
 
-### BPIP Lifecycle
-Statuses (copy Ethereum): Draft, Review, Last Call (with deadline), Final, Stagnant (if inactive for 6m), Withdrawn, Living
+#### BPIP Lifecycle
+Statuses: Draft, Review, Last Call (with deadline), Voting, Final, Stagnant (if inactive for 6m), Withdrawn, Living
 
 ![BPIP Status Diagram](./assets/diagram-BPIP.png)
 
-The poll happens after Last Call deadline passes, then can move to Final or Withdrawn, depending on the vote.
+The poll happens after `Last Call` deadline passes, then can move to `Final` or `Withdrawn`, depending on the vote.
 
-### BPIP Template
+#### BPIP Template
 Use BPIP-1 as a template for new proposals. The template mimics that of Ethereum. 
 
 **Preamble** should contain:
