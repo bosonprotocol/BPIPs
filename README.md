@@ -1,6 +1,6 @@
 # Boson Protocol Improvement Proposals (BPIPs)
 
-Anyone can suggest and lead a change in Boson Protocol's technological stack. We follow a simple process that is common in web3, as described below. We welcome suggestions for tweaking it further.
+Anyone can suggest and lead a change in Boson Protocol's technological stack through Boson Protocol Improvement Proposals (pronounced _bee-pips_). We follow a simple process that is common in web3, as described below. We welcome suggestions for tweaking it further.
 
 The BPIP process is described in the [BPIP-1](./content/BPIP-1.md) document, please follow the steps there. Before putting in the work and creating a new proposal, it is preferred to initiate a discussion with the community in Boson Protocol's Discord channel at https://discord.com/channels/811155042714779678/922532540416421918.
 
