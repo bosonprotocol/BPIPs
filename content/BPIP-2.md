@@ -24,9 +24,9 @@ Escalated dispute resolution creates a centralized element in the protocol. In s
 
 In order to implement integration of Kleros Protocol the following changes have to be made
 
-- Expose interfaces for an external system to interact with the escalated dispute resolution process
-- Implement changes to keep the state of buyer and seller mutual resolution proposals on-chain
-- Implement a "Connector" smart contract that implements `IArbitrable`, `IMetaEvidence` and `IEvidence` Kleros interfaces. And implements Boson Protocol interfaces for dispute resolution interfaces
+- Expose interfaces for external systems to interact with the escalated dispute resolution process
+- Implement changes to keep the state of the buyer and seller mutual resolution proposalss on-chain
+- Implement a "Connector" smart contract that implements `IArbitrable`, `IMetaEvidence` and `IEvidence` Kleros interfaces. And implements Boson Protocol dispute resolution interfaces
 - Create a dedicated marketplace sub-court by submitting a proposal to the Kleros DAO
 
 ### Boson Protocol Changes
