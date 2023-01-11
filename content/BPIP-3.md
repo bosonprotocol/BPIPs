@@ -166,5 +166,8 @@ This specification does not break backward compatibility.
 ### Protocol
 * Implemented [here](https://github.com/bosonprotocol/boson-protocol-contracts/pull/490).
 
+### Discussion
+* Discussed [here](https://github.com/bosonprotocol/BPIPs/issues/3).
+
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
