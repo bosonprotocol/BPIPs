@@ -27,7 +27,10 @@ The following methods are added.
      * Caller must have PROTOCOL role.
      *
      * Reverts if:
-     * - Start id is not greater than zero
+     * - Start id is not greater than zero for the first range
+     * - Start id is not greater than the end id of the previous range for subsequent ranges
+     * - Range length is zero
+     * - Range length is too large, i.e., would cause an overflow
      * - Offer id is already associated with a range
      *
      * @param _offerId - the id of the offer
@@ -146,6 +149,42 @@ The following method is added.
     ) external;
 ```
 
+#### IBosonOfferHandler
+The following method is added.
+```solidity
+    /**
+     * @notice Reserves a range of vouchers to be associated with an offer
+     *
+     *
+     * Reverts if:
+     * - The offers region of protocol is paused
+     * - The exchanges region of protocol is paused
+     * - Offer does not exist
+     * - Offer already voided
+     * - Caller is not the seller
+     * - Range length is zero
+     * - Range length is greater than quantity available
+     * - Range length is greater than maximum allowed range length
+     * - Call to BosonVoucher.reserveRange() reverts
+     *
+     * @param _offerId - the id of the offer
+     * @param _length - the length of the range
+     */
+    function reserveRange(uint256 _offerId, uint256 _length) external;
+```
+#### IBosonOrchestrationHandler
+For convenience, all orchestration methods that allow offer creation, get a counterpart method that allow range reservation at the same time. Seller needs to provide an additional input which tells how many vouchers can be preminted. New methods are
+These methods are not essential for this BPIP, so full specification is not provided. Revert reasons, events emitted and input parameters are union of revert reasons, events emitted and input parameters of base functions, combined in given orchestration function. List of suggested orchestration methods:
+- createSellerAndPremintedOffer
+- createPremintedOfferWithCondition
+- createPremintedOfferAddToGroup
+- createPremintedOfferAndTwinWithBundle
+- createPremintedOfferWithConditionAndTwinAndBundle
+- createSellerAndPremintedOfferWithCondition
+- createSellerAndPremintedOfferAndTwinWithBundle
+- createSellerAndPremintedOfferWithConditionAndTwinAndBundle
+
+
 ## Interactions 
 ![Pre-minted Vouchers Interactions Diagram](./assets/bpip-3/Preminted-Vouchers-Diagram.png "Pre-minted Voucher Sequences Diagram")
 
@@ -155,19 +194,47 @@ Several other potential implementations were considered and options analysis per
 ## Backward compatibility
 This specification does not break backward compatibility.
 
+Still it is important that when upgrade is done voucher contracts are upgraded before the protocol is upgraded.
+
 ## Implementation
 ### BosonVoucher
-* Support the tracking of reserved ranges so that exchange id and token id can remain the same.
-* Emit events that look as if vouchers have been minted, but don't store the owner address to conserve the bulk of an actual minting's gas. 
-* In the ownerOf method, if the token id is in a reserved range and has no stored owner, report the contract owner (the seller) as the owner of the voucher. 
-* Add a hook transfer hook that will detect if the voucher is being transferred to the first real owner, and if so, call the commitToPremintedOffer protocol method, which does not require payment.
+
+* Range reservation
+  * Must be done before preminting can happen.
+  * Ranges must be strictly increasing, i.e. start of new range must be greater than current highest range.
+  * Store information about associated offer id, range start and range length.
+  * The tracking of reserved ranges enables that exchange id (in protocol) and token id (voucher contract) can remain the same.
+* Preminting
+  * Can be done in batches. This allows to premint the quantites that could otherwise not be possible because of the block gas limit. Additionally it allows seller, to only partially release vouchers to the market.
+  * Preminting is always done to contract owner's address. It emits events that look as if vouchers have been minted, but don't store the owner address to conserve the bulk of an actual minting's gas. 
+* Token ownership
+  * Change ERC721 method `ownerOf`, so it properly reports the owner.
+  * If token id is in a reserved range, has already been preminted, but not yet transferred or burned, report the contract owner (the seller) as the owner of the voucher.
+  * In other cases return true owner if exists, or revert otherwise.
+* Preminted voucher transfer
+  * When preminted voucher is transferred for the first time, detect it in before transfer hook it and call the commitToPremintedOffer protocol method, which does not require payment.
+  * In all subsequent transfers, treat voucher as normal, i.e. call onVoucherTransferred protocol method.
+  * Since all inhered transfer methods (transferFrom and safeTranferFrom) revert if token id has no owner, it needs to be temporary updated whenever first transfer of preminted voucher.
+* Burn preminted vouchers
+  * Preminted vouchers can be burned when offer expires or is voided.
+  * Burning allows owner to removed unusable vouchers from their wallet.
+
 * Implemented [here](https://github.com/bosonprotocol/boson-protocol-contracts/pull/483).
 
+
 ### Protocol
+Offer creation remains the same as it was in previous versions. To enable preminted vouchers for an offer, seller just needs to call reserveRange method in the protocol, which effectively converts offer into a (partially) preminted offer.
+Offer can be
+  - fully preminted: reserved range matches initial quantity available. It makes it impossible to commit to offer directly.
+  - partially preminted: reserved range is less than quantity available. It is possible to commit to offer directly on the protocol or through primary transfer of a preminted voucher.
+  - not preminted: there is no reserved range for the offer. The only way to commit is directly on the protocol (same as in current version of the protocol).
+
+Reserve range can be called once per offer, so seller must in advandce decide how may vouchers can be preminted. Reserve range accepts only offer id and range length, while range start is determined based on current exchange id. Calling reserve range decreases quantity available and increases exchange id counter in the protocol. This means than it is now possible that exchange with higher id is created before the exchange with lower id.
+
+Decission if offer will support preminted vouchers or not does not need to be decided at offer creation time. Even is some user already commit to an offer, seller can reserve a range, as long as quantity available is greater than 0.
+If a seller wants to create an offer and reserve range in single transaction, they can use orchestration methods that enable it.
+
 * Implemented [here](https://github.com/bosonprotocol/boson-protocol-contracts/pull/490).
-
-### Discussion
-* Discussed [here](https://github.com/bosonprotocol/BPIPs/issues/3).
-
+  
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
