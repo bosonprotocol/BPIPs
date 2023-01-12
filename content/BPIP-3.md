@@ -189,7 +189,27 @@ These methods are not essential for this BPIP, so full specification is not prov
 ![Pre-minted Vouchers Interactions Diagram](./assets/bpip-3/Preminted-Vouchers-Diagram.png "Pre-minted Voucher Sequences Diagram")
 
 ## Rationale
-Several other potential implementations were considered and options analysis performed across quite a few important dimensions. This was the least objectionable approach.
+Vouchers, which are ERC721 NFTs show on marketplaces as soon as they are minted. Currently vouchers are minted at the same time when exchange is created, which means that whenever they are resold on secondary market, new buyer does not get full dispute period (i.e. transfer does not reset the timers in the protocol). In order to allow buyers on any marketplace to get full dispute period when they are the first owner of the voucher, we need a different solution. 
+
+One possible approach is to create a dedicated bridge contract, where sellers could create NFTs which would show on marketplaces. When buyers on marketplace bought them, this bridge NFT would be burnt and buyers would get redeemable voucher instead. However this approach breaks user flow in some marketplace and might be questionable since buyer gets a different NFT that was actually bought.
+
+Another approach was to enable mint on demand directly on voucher contract. Although it does not suffer from the same limitations than previous approach, mint is not standard ERC721 function, so compatibility with all marketplaces would be hard to achieve.
+
+This leads to this proposals, where vouchers are preminted directly on existing voucher contract. Their existence automatically means that they can be transferred as regular ERC721 NFTs, so they can be sold on any marketplace. Compared to first approach, voucher here is not burned, but simply transferred to a new owner (i.e. first buyer). This first transfer invokes `commitToPremintedOffer` on the protocol, which starts the exchange and effectively converts preminted voucher into a true voucher. After that, voucher behaves as other vouchers, i.e. dispute period starts at the time of the purchase, voucher can be redeemed, transferred etc.
+Important to note here is that we now have two types of voucher in the voucher contract:
+- preminted vouchers, with no exchange associated and
+- true vouchers, with exactly one exchange associated.
+  
+In current protocol, all vouchers are issued when protocol invokes `issueVoucher` method. In this proposal we add additional method `preMint` which allows seller (operator) to issue a desired number of vouchers.
+Since currently it holds that exchange id (in protocol) always matches token id (in voucher contract), it's desired that this stays even with premint. To achieve it, we propose a method to reserve range (`reserveRange`), which effectively reserves a desired number of exchange ids in the protocol. Then whenever a preminted voucher is converted into a true voucher, it keeps its token id and gets matching exchange id in the protocol.
+
+Although range reservation ultimately happens on voucher contract, method must be invoked true the protocol. That way it can be ensured that the amount of preminted vouchers never exceeds quantity available, set in the offer.
+
+If voucher expires or is voided, it currently means that buyers cannot commit to it anymore. However, with preminted vouchers it's possible that some of them were not bought before that happen. In this case protocol should also prevent committing to the offer, which then means that some of unusable vouchers are stuck in the contract and possibly on marketplaces. To delist them we suggest method to burn all preminted vouchers (`burnPremintedVouchers`) that cannot be redeemed anymore.
+
+Given that now buyer does not directly interact with the protocol, this opens the question, how to ensure protocol exchange guarantees (i.e. possibility to get funds back if something goes wrong). The proposed solution is than now seller needs to provide enough funds to cover both item price and seller deposit. This ensures buyer protection straight away, but it increases a seller's capital requirement a bit. However, this drawback is not to big, since as soon as marketplace exchange happens, seller receives the funds, which can be directly used to cover item price in next sales. Moreover, as soon as some exchange are finalized and funds are released back into seller's pool, those funds can be automatically used to cover future sales.
+
+This proposal might rise some efficiency concerns about the solution efficiency, since minting ERC721 is relatively costly operation. ERC1155 was considered as alternative, but it turned out that with it it's impossible to maintain nice exchange id and token id equivalence. To overcome the problem of ERC721 inefficiency we propose another solution. Since premint always assign token ownership to voucher contract owner, there is no need to explicitly store it's address during the premint. It's enough that only correct transfer events are emitted, while general consistency is achieved by overriding ERC721 `ownerOf`, `transferFrom` and `safeTransferFrom` methods to correctly manage all tokens that were preminted.
 
 ## Backward compatibility
 This specification does not break backward compatibility.
@@ -205,8 +225,9 @@ Still it is important that when upgrade is done voucher contracts are upgraded b
   * Store information about associated offer id, range start and range length.
   * The tracking of reserved ranges enables that exchange id (in protocol) and token id (voucher contract) can remain the same.
 * Preminting
-  * Can be done in batches. This allows to premint the quantites that could otherwise not be possible because of the block gas limit. Additionally it allows seller, to only partially release vouchers to the market.
+  * Can be done in batches. This allows to premint the quantities that could otherwise not be possible because of the block gas limit. Additionally it allows seller, to only partially release vouchers to the market.
   * Preminting is always done to contract owner's address. It emits events that look as if vouchers have been minted, but don't store the owner address to conserve the bulk of an actual minting's gas. 
+  * Preminting always mints consecutive token ids, starting with lowest non-minted id in the range.
 * Token ownership
   * Change ERC721 method `ownerOf`, so it properly reports the owner.
   * If token id is in a reserved range, has already been preminted, but not yet transferred or burned, report the contract owner (the seller) as the owner of the voucher.
@@ -229,9 +250,9 @@ Offer can be
   - partially preminted: reserved range is less than quantity available. It is possible to commit to offer directly on the protocol or through primary transfer of a preminted voucher.
   - not preminted: there is no reserved range for the offer. The only way to commit is directly on the protocol (same as in current version of the protocol).
 
-Reserve range can be called once per offer, so seller must in advandce decide how may vouchers can be preminted. Reserve range accepts only offer id and range length, while range start is determined based on current exchange id. Calling reserve range decreases quantity available and increases exchange id counter in the protocol. This means than it is now possible that exchange with higher id is created before the exchange with lower id.
+Reserve range can be called once per offer, so seller must in advance decide how may vouchers can be preminted. Reserve range accepts only offer id and range length, while range start is determined based on current exchange id. Calling reserve range decreases quantity available and increases exchange id counter in the protocol. This means than it is now possible that exchange with higher id is created before the exchange with lower id.
 
-Decission if offer will support preminted vouchers or not does not need to be decided at offer creation time. Even is some user already commit to an offer, seller can reserve a range, as long as quantity available is greater than 0.
+Decision if offer will support preminted vouchers or not does not need to be decided at offer creation time. Even is some user already commit to an offer, seller can reserve a range, as long as quantity available is greater than 0.
 If a seller wants to create an offer and reserve range in single transaction, they can use orchestration methods that enable it.
 
 * Implemented [here](https://github.com/bosonprotocol/boson-protocol-contracts/pull/490).
