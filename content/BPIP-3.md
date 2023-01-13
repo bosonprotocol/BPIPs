@@ -1,7 +1,7 @@
 ---
 bpip: 3
 title: Pre-minted Vouchers (Shell rNFTs)
-discussions-to: 
+discussions-to: https://github.com/bosonprotocol/BPIPs/issues/3
 status: Living
 created: 2022-11-22
 ---
