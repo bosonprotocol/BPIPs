@@ -10,4 +10,4 @@ Boson Protocol Improvement Proposals offer a path for contributing to Boson Prot
 * SDK and widgets
 * and parameters of the protocol itself.
 
-As these are vastly different changes, the process for each is a bit different. We are looking into automating it and further decentralize all the operations in a progressive way. Last but not least, check our Grants page for funding your project at: https://www.bosonprotocol.io/build/
+As these are vastly different changes, the process for each is a bit different. We are looking into automating it and further decentralize all the operations in a progressive way. Last but not least, check our Grants page for funding your project at: https://bosonprotocol.io/build/

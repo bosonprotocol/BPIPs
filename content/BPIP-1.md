@@ -58,7 +58,7 @@ Use BPIP-1 as a template for new proposals. The template mimics that of Ethereum
 
 **Discussions** are preferred to be kept within this Github repository.
 
-The preample must be followed by the **main section**:
+The preamble must be followed by the **main section**:
 * Abstract - A concise description of the proposal.
 * Motivation - Describing motivation behind a BPIP is crucial in order to understand why a proposal is needed and the project can't cover this need as-is.
 * Specification - Technical specification describes the proposed changes in a sufficient detailed that can be used as basis for in-depth discussion and later implementation. This section must also include the type of the proposal.
