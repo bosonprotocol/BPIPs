@@ -18,7 +18,7 @@ Currently protocol doens't supports price discovery because price is a immutable
 
 ### Options:
 
-1. **Turn Boson Vouchers compatible.** 
+1. **Turn Boson Vouchers compatible.**<br>
     Boson Vouchers are ERC721 and therefore it's easier to make them compatible with price discovery features such as AMMs and Auctions mechanism. 
     NFT pools work just ERC20 tools. Pools that are willing to buy or sell NFTs will return the same price no matter which NFT is sent in or out from the collection. 
     That makes the current implementation of Boson Vouchers incompatible with NFT pools because Vouchers can represent different offers with different initial prices.
@@ -26,7 +26,7 @@ Currently protocol doens't supports price discovery because price is a immutable
 
     **How do we communicate the price paid for the voucher to the protocol?**
     The price is a crutial info for the protocol as we still want that protocol guarantees remain unbroken, so when a sale happens outside the protocol (no matter how this sale happens, can be seller selling preminted
-    vouchers on marketplaces, an auction, an AMM pool, a secundary sale using a settlement protocol, etc) we need somehow inform protocol about the order price.
+    vouchers on marketplaces, an auction, an AMM pool, a secundary sale using a settlement protocol, etc) we need inform protocol about the exchange price.
 
     In order to make this happens we would have to request both parties (buyer and seller) to confirm the exchange. 
     Just as proposed for [sequential commit](https://docs.google.com/document/d/1lb6ERrGtOg2iPjf17CfHJRuKWwPdkvQRsLQ3yV_0nh0/edit#heading=h.e4aw2z4amzsr),
@@ -34,35 +34,50 @@ Currently protocol doens't supports price discovery because price is a immutable
 
     Open questions:
      - How imperment loss can influence seller misbehavior?
-     - Seller has any advantage in deciding not confirm the exchange?
+     - Seller has any incentive to not confirm the exchange?
+     - Buyer has any incetive to not confirm the exchange?
+     - Secondary saller needs to confirm the exchange? 
          
     **Pros**:
-     - ✅ Seller can pre-mint vouchers (Shell NFTs) to deposit into an AMM pool, e.g:
+     - ✅ Seller can use pre-mint vouchers (Shell NFTs) to deposit into an AMM pool, e.g:
         1. Seller creates an offer with the price set to 10 MATIC and quantity available set to 100.
         2. Seller pre-mint 100 Vouchers from this new offer. Offer quantity available becomes 0. There is no commit available to be done directly in the protocol.
         3. Seller deposits these 100 vouchers into a Voucher/Matic pool. 
         4. Now the price for the vouchers will be discovered by the bonding curve selected for the pool.
      - ✅ Works with secondary market as well. Any voucher owner can deposit their voucher in the correspondent offer pool, or even create their own pool. 
-     - ✅ Easy to implement. We can reuse Boson Vouchers instead of creating a hole new thing.
 
     **Cons**:
      - ❌ Incompatible with existing Boson Vouchers. Would be a breaking change upgrade.
 
-2. **Turn price an generic interface instead of a immutable value.**
-    Price is a generic interface that can be:
-      - An immutable value (as currently works)
-      - An ERC721 token, e.g:
-        1. Seller creates an Offer O and the price is any token from an ERC721 collection C.
-        2. Buyers needs to acquire a token from this collection C to be able to commit to Offer 0.
-           Buyer B acquired this "gate" (need to find a better name to avoid confusion with gated offers) token from a AMMs pool, an auction, any marketplace, etc.
-        3. Buyer B now has a token X and can commit to Offer 0.
-        4. Buyer B commits to offer O and transfer token X to protocol. 
+2. **Turn price an generic interface instead of a immutable value.**<br>
+    Price is a generic interface that can be a immutable value set on offer creation or:<br>
+      2.1 price discovery happens off-chain: A signed message with prove both parties are ok with price (same as proposed on option 1)<br>
+      2.2 price discovery happens on-chain: whenever buyer buys it there, it needs to invoke our commitToOffer, or sequentialCommitToOffer together with price that was determined in some trusted way.<br>
+      2.3 price discovery can happen both on and off chain: both parties need to sign a message (same as 2.1) 
 
     **Pros**:
       - ✅ No breaking changes. - need to confirm
 
     **Cons**:
-      - ❌ Doesn't fully support secondary market. Boson Vouchers remain incompatible with AMMs and therefore secondary market can only make use of the auction mechanism.
+      - ❌ Boson Vouchers remain incompatible with AMMs.
+
+3. **Build custom price discovery mechanism inside the protocol**<br>
+    We build or own price discovery solution
+
+    **Pros**:
+      - ✅ We can customize as we want
+
+    **Cons**:
+      - ❌ Incompatible with existing price discovery solution 
+
+|                                          | compatible with existing<br>price discovery solutions | supports secondary market | development complexity |   
+|------------------------------------------|-------------------------------------------------------|---------------------------|------------------------|
+| **Opt1: turn boson vouchers compatible**    | ✅                                                   | ✅                       | BV breaking change     |   
+| **Opt 2.1: generic interface + off-chain**   | ✅                                                   | ✅                       |                        |   
+| **Opt 2.2: generic interface + on-chain**    | ❌                                                    | ✅                       |                        |   
+| **Opt 2.3: generic interface + on/off-chain**| ✅                                                   | ✅                       |                        |
+| **Opt 3: build custom solution on protocol** | ❌                                                    | ✅                           |                        |   
+
 
 ## Rationale
 /
