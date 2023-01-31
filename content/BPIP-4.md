@@ -1,8 +1,8 @@
 ---
 bpip: 4
 title:  Support price discovery 
-discussions-to: 
-status: Living
+discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/9
+status: Draft 
 created: 2023-01-25
 ---
 
@@ -12,72 +12,67 @@ This proposal describe necessary changes on protocol in order to support price d
 
 ## Motivation
 
-Currently protocol doens't supports price discovery because price is a immutable value set on offer creation.
+Currently, BP doesn't support price discovery because the price is an immutable value set on offer creation.
+There are some well-validated price discovery mechanisms on-chain and off-chain on the market, such as Automated Market Markers (AMMs), 
+auction systems, order books. Making BP compatible with these mechanisms opens up an entirely new world of opportunity.
+Allowing sellers to let the market discover the price for a product with AMMs, creating auctions for exclusive items, 
+and what about a 24x7 order book of any physical item?
 
 ## Specification 
 
+Turn price an generic interface instead of a immutable value.
+Price is a generic interface that can be a uint256 immutable value set on offer creation or:
+
 ### Options:
 
-1. **Turn Boson Vouchers compatible.**<br>
-    Boson Vouchers are ERC721 and therefore it's easier to make them compatible with price discovery features such as AMMs and Auctions mechanism. 
-    NFT pools work just ERC20 tools. Pools that are willing to buy or sell NFTs will return the same price no matter which NFT is sent in or out from the collection. 
-    That makes the current implementation of Boson Vouchers incompatible with NFT pools because Vouchers can represent different offers with different initial prices.
-    To make it compatible with AMMs, we must turn Boson Vouchers collections individual to offers - instead of sellers, so the initial price for the entire vouchers in the pool is the same (the offer price). 
+1. **Price discovery happens only off-chain:** <br>
+    A signed message passed on `commitToOffer`/`sequentialCommitToOffer` proves that both seller and buyer agree with the price. 
+    `commitToOffer`/`sequentialCommitToOffer` accepts 2 new parameters, a uint256 `price` and a bytes `signature` using EIP712 
+    format which needs to be signed by the seller (or the contrary when is a bid order) and that matches offerId and price passed 
+    as parameter by the buyer.
 
-    **How do we communicate the price paid for the voucher to the protocol?**
-    The price is a crutial info for the protocol as we still want that protocol guarantees remain unbroken, so when a sale happens outside the protocol (no matter how this sale happens, can be seller selling preminted
-    vouchers on marketplaces, an auction, an AMM pool, a secundary sale using a settlement protocol, etc) we need inform protocol about the exchange price.
+    The amount of signatures would depend upon on the choosed price discovery solution.<br>
+    Example of an simple offchain orderbook:
+      - UX Ask:
+        * Seller sign a EIP712 ask order with offer and price 
+        * Only if exchange token is ERC20: Buyer approve exchangeToken transfer [tx]
+        * Buyer calls `commitToOffer` passing price and seller signature [tx]
+      - UX Bid: 
+        * Buyer sign a EIP721 bid order with offer and price and submit it to orderbook 
+        * Buyer approve exchangeToken transfer if ERC20 or buyer deposit the bid price into protocol [tx] <br>
+          Must adapt `depositFunds` method to accept buyer funds as well 
+        * Seller accepts the offer and commit to protocol [tx] <br>
+          Must create a new commit to offer function which can be called by seller and accepts buyer signature
 
-    In order to make this happens we would have to request both parties (buyer and seller) to confirm the exchange. 
-    Just as proposed for [sequential commit](https://docs.google.com/document/d/1lb6ERrGtOg2iPjf17CfHJRuKWwPdkvQRsLQ3yV_0nh0/edit#heading=h.e4aw2z4amzsr),
-    both seller and buyer signs the exchange and then somebody submit to the protocol.
+    The problem here is that signature must match the exactly price that the order was fullfilled.  
+    This works for simple orders, but becomes a UX problem for limit, stop-limit and market orders.
+    The same UX problem occurs for others price discovery system like auctions.
+      
+2. **Price discovery can happen both on-chain/off-chain and transaction start by calling protocol:**<br>
+    `commitToOffer` and `sequentialCommitToOffer` has additional input field - an struct `priceDiscovery`.
 
-    Open questions:
-     - How imperment loss can influence seller misbehavior?
-     - Seller has any incentive to not confirm the exchange?
-     - Buyer has any incetive to not confirm the exchange?
-     - Secondary saller needs to confirm the exchange? 
-         
-    **Pros**:
-     - ✅ Seller can use pre-mint vouchers (Shell NFTs) to deposit into an AMM pool, e.g:
-        1. Seller creates an offer with the price set to 10 MATIC and quantity available set to 100.
-        2. Seller pre-mint 100 Vouchers from this new offer. Offer quantity available becomes 0. There is no commit available to be done directly in the protocol.
-        3. Seller deposits these 100 vouchers into a Voucher/Matic pool. 
-        4. Now the price for the vouchers will be discovered by the bonding curve selected for the pool.
-     - ✅ Works with secondary market as well. Any voucher owner can deposit their voucher in the correspondent offer pool, or even create their own pool. 
+    ```solidity
+    struct PriceDiscovery {
+      uint256 price
+      address validator
+      bytes encodedFunction 
+    }
+    ```
+    Validator is an external contract responsible for checking if there is a consensus on the price between the seller and buyer.
+    The protocol will call encodedFunction on the validator contract before commit to the offer. 
+    For example, the validator could try to buy a Voucher on an AMM (this AMMs system would need to be compatible with BV, and existing 
+    solutions aren't, see #notes section) with the price set by the buyer (UI can simulate the price for the buyer before trying to commit 
+    and validator can allow slippage config) and then forward the voucher to the respected buyer if the transaction succeeds. 
+    If the validator transaction reverts, then `commitToOffer` also reverts. Price could also be a parameter encoded directly on `encondedFunction`
+    
+    Validator could also check for off-chain consensus using the same signature approach proposed for option 1. 
 
-    **Cons**:
-     - ❌ Incompatible with existing Boson Vouchers. Would be a breaking change upgrade.
+3. **Price discovery happens on-chain and transaction start externally to protocol:**
 
-2. **Turn price an generic interface instead of a immutable value.**<br>
-    Price is a generic interface that can be a immutable value set on offer creation or:<br>
-      2.1 price discovery happens off-chain: A signed message with prove both parties are ok with price (same as proposed on option 1)<br>
-      2.2 price discovery happens on-chain: whenever buyer buys it there, it needs to invoke our commitToOffer, or sequentialCommitToOffer together with price that was determined in some trusted way.<br>
-      2.3 price discovery can happen both on and off chain: both parties need to sign a message (same as 2.1) 
-
-    **Pros**:
-      - ✅ No breaking changes. - need to confirm
-
-    **Cons**:
-      - ❌ Boson Vouchers remain incompatible with AMMs.
-
-3. **Build custom price discovery mechanism inside the protocol**<br>
-    We build or own price discovery solution
-
-    **Pros**:
-      - ✅ We can customize as we want
-
-    **Cons**:
-      - ❌ Incompatible with existing price discovery solution 
-
-|                                          | compatible with existing<br>price discovery solutions | supports secondary market | development complexity |   
-|------------------------------------------|-------------------------------------------------------|---------------------------|------------------------|
-| **Opt1: turn boson vouchers compatible**    | ✅                                                   | ✅                       | BV breaking change     |   
-| **Opt 2.1: generic interface + off-chain**   | ✅                                                   | ✅                       |                        |   
-| **Opt 2.2: generic interface + on-chain**    | ❌                                                    | ✅                       |                        |   
-| **Opt 2.3: generic interface + on/off-chain**| ✅                                                   | ✅                       |                        |
-| **Opt 3: build custom solution on protocol** | ❌                                                    | ✅                           |                        |   
-
+|  | compatible with existing solutions | development complexity | UX |
+|---|---|---|---|
+| Opt 1:  | only off-chain solutions |  | (x sign + 2 tx) |
+| Opt 2 | except with AMMs |  |  |
 
 ## Rationale
 /
@@ -87,6 +82,8 @@ Currently protocol doens't supports price discovery because price is a immutable
 /
 
 ## Implementation
+
+
 /
 
 ## Copyright waiver & license
