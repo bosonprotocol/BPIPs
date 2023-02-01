@@ -25,8 +25,12 @@ Price is a generic interface that can be a uint256 immutable value set on offer 
 
 ### Notes
 
-Usually, AMMs pools are design to return the same price no matter which NFT is sent in or out from the collection. 
-Thats make currently implementation of Boson Vouchers incompatible with existing NFT AMMs because Vouchers can represent different offers with different initial prices.
+- Usually, AMMs two-sided trading pool are design to return the same price no matter which NFT is sent in or out from the collection. 
+  Thats make currently implementation of Boson Vouchers incompatible with existing NFT two-sided AMMs because Vouchers can represent different offers with different initial prices.
+- Single-sided buy-only pools also wouldn't work with BV (except if all offers should be sort of equivalent).
+- One-sided sell-only pools could work with current vouchers because there is no limitation how many pools for single NFT contract can be created (each pool gets its own clone address), 
+  and one wallet can be owner of multiple sell-only pools. And in sell-only, seller is the one that determines which nfts are part of the pool. So a seller could create a sell-only 
+  pool for each Boson offer and even choose different bonding curves for each pool.
 
 ### Options:
 
@@ -125,23 +129,22 @@ Thats make currently implementation of Boson Vouchers incompatible with existing
       - it enables to use existing protocols such as 0x, SeaPort so it could support whatever price discovery mechanisms they support
       - if later new price discovery mechanism emerge, it should be ready without modification<br>
     - **Cons:**
-      - incompatible with existing AMMs solutions
+      - incompatible with existing two-side and single-side buy pools solutions
 
-    1.3. **Price discovery happens both on-chain/off-chain with in protocol validation or off-chain validation:**<br>
+    1.3. **Price discovery happens both on-chain/off-chain with in protocol validation or outside protocol validation:**<br>
       Combinantion of option 1 and option 2. `commitToOffer` and `sequentialCommitToOffer` has additional input field - an struct `priceDiscovery`.
 
       ```solidity
         struct PriceDiscovery {
           uint256 price
           address validator // zero address or protocol address when type is Offchain
-          bytes proof // proof is validator calldata (type Onchain) or an EIP712 signature (type Offchain)
-          PriceDiscoveryType type
+          bytes proof // proof is validator calldata (opt 2) or an EIP712 signature (opt 1)
         }
       ```
 
     1.4 **Price discovery happens both on-chain/off-chain and we make BosonVoucher compatible with AMMs**
 
-      As I’ve explained in the notes, existing NFT AMMs aren’t compatible with Boson Vouchers. 
+      As I’ve explained in the notes, existing NFT two-side and single-side buy pools aren’t compatible with Boson Vouchers. 
       To make it compatible with AMMs we must turn Boson Vouchers collections individual to offers - instead of sellers,
       so the initial price for the entire vouchers in the pool is the same (the offer price).
       This option is a combination necessary changes to Boson Vouchers and option 1.2.
@@ -171,8 +174,8 @@ Thats make currently implementation of Boson Vouchers incompatible with existing
 |  | compatible with existing solutions | development complexity | UX |
 |---|---|---|---|
 | Opt 1.1  | only off-chain solutions | 🟢 | 1 sign + 2 tx |
-| Opt 1.2 | except existing AMMs | 🟡 | 3 tx |
-| Opt 1.3 | except existing AMMs | 🟡 | 3 tx or 1 sign + 2 tx |
+| Opt 1.2 | except existing AMMs (2-side and buy pools)| 🟡 | 3 tx |
+| Opt 1.3 | except existing AMMs (2-side and buy pools) | 🟡 | 3 tx or 1 sign + 2 tx |
 | Opt 1.4 | compatible | 🔴 | 3 tx
 | Opt 2 | incompatible | 🟢 | depends on the PD solution design
 
