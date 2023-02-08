@@ -8,188 +8,207 @@ created: 2023-01-25
 
 ## Abstract
 
-This proposal describe necessary changes on protocol in order to support price discovery. 
+This proposal defines an Interface that extends the protocol to enable price discovery. The changes proposed will allow Sellers to pick their price discovery method of choice so that they can leverage external price discovery mechanisms. .
 
 ## Motivation
 
-Currently, BP doesn't support price discovery because the price is an immutable value set on offer creation.
-There are some well-validated price discovery mechanisms on-chain and off-chain on the market, such as Automated Market Markers (AMMs), 
-auction systems, order books. Making BP compatible with these mechanisms opens up an entirely new world of opportunity.
-Allowing sellers to let the market discover the price for a product with AMMs, creating auctions for exclusive items, 
-and what about a 24x7 order book of any physical item?
+Currently, BP doesn't support price discovery. The price is currently represented as a uint256 within the Offer struct which is set by the Seller at Offer creation time. We see a need for Sellers to be able to use the protocol to leverage a price discovery system that will in turn discover the best price for their Offers. We believe this would be a key driver for adoption. There are several well-established price discovery mechanisms available both on-chain and off-chain on the market, such as Automated Market Makers (AMMs), auction systems, and order books. Making BP compatible with these mechanisms would open up an entirely new world of opportunity, such as allowing sellers to utilise AMMs for market-driven pricing, create auctions for exclusive items, and support 24/7 orderbooks for physical items.
+
 
 ## Specification 
 
-Turn price an generic interface instead of a immutable value.
-Price is a generic interface that can be a uint256 immutable value set on offer creation or:
+With respect to Price Discovery and Boson Protocol Offers it is important to note the differences between single Offers (i.e. Offer with a quantity set to 1) and with Offers that have multiple instances (i.e. quantity > 1). We believe that these two classes of Offers are most likely going to employ different Price Discovery methods, e.g. Single offers will tend to be auctioned, whereas Multi-instance offers may employ a bonding curve for example. Furthermore, we believe that the Price Discovery Interface must address the needs of both of these two distinct Offer use cases. 
 
-### Notes
+In the proposed changes, the price for items in an offer can either be established at the time of offer creation which applies to all items within the offer (maintaining compatibility with existing offers), or it can be dynamically determined upon buyer commitment.
 
-- Usually, AMMs two-sided trading pool are design to return the same price no matter which NFT is sent in or out from the collection. 
-  Thats make currently implementation of Boson Vouchers incompatible with existing NFT two-sided AMMs because Vouchers can represent different offers with different initial prices.
-- Single-sided buy-only pools also wouldn't work with BV (except if all offers should be sort of equivalent).
-- One-sided sell-only pools could work with current vouchers because there is no limitation how many pools for single NFT contract can be created (each pool gets its own clone address), 
-  and one wallet can be owner of multiple sell-only pools. And in sell-only, seller is the one that determines which nfts are part of the pool. So a seller could create a sell-only 
-  pool for each Boson offer and even choose different bonding curves for each pool.
+The proposal is to add an additional input field in the form of a new struct `priceDiscovery` to `commitToOffer` and `sequentialCommitToOffer` 
 
-### Options:
+  ```solidity
+  struct PriceDiscovery {
+    uint256 price
+    address validator
+    bytes proof 
+  }
+```
 
-1. **transaction start by calling protocol**<br>
-
-    1.1 **off-chain with in protocol validation:** <br>
-      A signed message passed on `commitToOffer`/`sequentialCommitToOffer` proves that both seller and buyer agree with the price. 
-      `commitToOffer`/`sequentialCommitToOffer` accepts 2 new parameters, a uint256 `price` and a bytes `signature` using EIP712 
-      format which needs to be signed by the seller (or the contrary when is a bid order) and that matches offerId and price passed 
-      as parameter by the buyer.
-
-      Example of an simple offchain orderbook:
-        - UX Ask:
-          * Seller sign a EIP712 ask order with offer and price 
-          * Only if exchange token is ERC20: Buyer approve exchangeToken transfer [tx]
-          * Buyer calls `commitToOffer` passing price and seller signature [tx]
-        - UX Bid: 
-          * Buyer sign a EIP712 bid order with offer and price and submit it to orderbook 
-          * Buyer approve exchangeToken transfer if ERC20 or approves WETH if is native token [tx] <br>
-          * Seller accepts the offer and commit to protocol [tx] <br>
-
-
-      Must create a new commit to offer function (or adapt existing commitToOffer) which can be called by seller and accepts buyer signature
-
-    - **Pros:** 
-        - simpler 
-    - **Cons:**
-        - works only for off-chain price discovery
-        - the EIP712 message structure will have to be dinamically enough to be compatible with different existing price discovery solutions, or we would have to 
-          design something completely new and propose a new interface for price discovery communication - and consequently not compatible with existing solutions.
-
-          
-    1.2 **Price discovery happens both on-chain/off-chain**<br>
-      `commitToOffer` and `sequentialCommitToOffer` has additional input field - an struct `priceDiscovery`.
-
-      ```solidity
-      struct PriceDiscovery {
-        uint256 price
-        address validator
-        bytes proof 
-      }
-      ```
-
-    Validator is an external price discovery contract and proof is a function that the protocol will call on the validator contract before commit to the offer. 
-    For example, the validator could be an AMM router (this AMMs system would need to be compatible with BV, and existing 
-    solutions aren't, see notes section) and try to buy a voucher with the config passed by buyer on proof function
-    (UI can simulate the price for the buyer before trying to commit and validator can allow slippage config) and weither send the voucher directly for buyer or 
-    send it to protocol (msg.sender) and then protocol forward to buyer. If the proof call reverts, then `commitToOffer` also reverts. 
+The intention is that `validator` is an external price discovery contract and the proof is a function that the protocol will call on the validator contract before allowing a buyer to commit to an Offer. For example, the validator could be an AMM router, and the buyer would have to provide a proof to the validator, if the proof call succeeds, then `commitToOffer` would also succeed, otherwise, it would revert. . 
     
-    Flow depends on how validator works. If validator always sends voucher to `msg.sender` (Boson Protocol) a few additional steps are needed. 
-    Let's call this validator "simple". If validator allows order matching (or some similar mechanism) it means that voucher and exchange token can be exchanged 
-    directly even if `msg.sender` is none of them. Let's call this kind of validator "advanced"
-  
-    - Ask flow: 
-      - seller approves protocol to transfer exchange tokens. If offer is native, they must approve WETH. This will be needed in the last step. [tx]
-      - buyer approves [tx]
-          * protocol to transfer the funds, if validator is simple
-          * validator to transfer the funds, if validator is advanced
-      - buyer calls `commitToOffer`/`sequentialCommitToOffer`: [tx]  
-        - if validator is simple: (skip these steps otherwise)
-           * transfer buyers funds to protocol 
-           * approve validator to transfer protocol's funds 
-        - store information about the price in the protocol
-        - calculate amount to go in the escrow (full price in case of initial commit; and minimal escrow in case of sequential commit)
-        - make a call to `validator` with `proof` as calldata. Continue only if it succeeds.
-        - if validator is simple:
-            * transfer voucher to buyer
-        - if validator is advanced:
-            * make sure buyer is owner of the voucher, otherwise revert
-        - check own balance to see if validator returned some funds (possible both with simple and advanced validators)
-        - Transfer minimal required funds from seller into the escrow
+### Examples: 
 
-    - Bid flow:
-      - buyer create a bid offer on validator 
-        * with protocol as the seller, if validator is simple
-        * normally, if validator is avanced
-      - if validator is simple:
-        * seller approves protocol to transfer the voucher (potentially this can be skipped, since we could use access controller contract to give protocol privilege to transfer voucher without owner's approval) [tx]
-      - is validator is advanced: 
-        * seller approves protocol to transfer exchange tokens. If offer is native, they must approve WETH. This will be needed in the last step. [tx]
-        * seller approves validator to transfer the voucher
-      - Seller (or somebody authorized) calls `commitToOffer`/`sequentialCommitToOffer` with the bid price: [tx] 
-        * store information about the price in the protocol
-        * calculate amount to go in the escrow (full price in case of initial commit; and minimal escrow in case of sequential commit)
-        * make a call to validator with proof as calldata. Continue only if it succeeds.
-        * if validator is simple:
-          - keep minimum amount in the escrow and transfer the remainder to seller
-        * if validator is advanced:
-          - make sure buyer is owner of the voucher, otherwise revert
-          - check own balance to see if validator returned some funds (possible both with simple and advanced validators)
-          - transfer minimal required funds from seller into the escrow
+#### Single Offer example <br>
+*Seller wants to create an auction for an exclusive item.*
 
-    Must create a new commit to offer function (or adapt existing commitToOffer) which can be called by seller or by some allowed party.
+**Steps:**
+  1. Seller creates an Offer in BP (with quantity = 1) [tx]
+  2. Seller Funds the Seller Pool [tx]
+  3. Seller preMints the offer voucher [tx] <br>
+       *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
+  4. Seller chooses an external auction protocol of their preference, External Protocol (EP)
+  5. Seller creates an auction on the EP.<br>
+  6. Seller gives permission for EP to transfer the voucher  
+  7. buyer approves BP to transfer exchange token
+  8. Buyer calls `commitToOffer` passing the bid price, the EP address as validator and the EP bid function encoded as the proof.<br>
+      * BP call proof on EP contract (validator address)
+      * Check if protocol received the BV, otherwise reverts (the bid failed)
+      * BP transfers the received voucher to the buyer 
+      * BP checks its own balance to see if the validator returned some funds beyond BV and forwards extra funds to the buyer
+      * Transfer minimal required funds from the seller into the escrow
 
-    - **Pros:**
-      - it enables to use existing protocols such as 0x, SeaPort so it could support whatever price discovery mechanisms they support
-      - if later new price discovery mechanism emerge, it should be ready without modification<br>
-    - **Cons:**
-      - incompatible with existing two-side and single-side buy pools solutions
+#### An example of a multi-instance Offer (i.e, quantity > 1). <br>
+*Seller wants to use a bonding curve to let the market discover the price*
 
-    1.3. **Price discovery happens both on-chain/off-chain with in protocol validation or outside protocol validation:**<br>
-      Combinantion of option 1 and option 2. `commitToOffer` and `sequentialCommitToOffer` has additional input field - an struct `priceDiscovery`.
+**Steps:**
+  1. Seller creates the BP Offer (with quantity > 1) [tx]
+  2.  Seller Funds the Seller Pool [tx]
+  3. Seller preMint the vouchers [tx] <br>
+     *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
+  4. Seller chooses an external AMM protocol of their preference, External Protocol (EP)
+  5. Seller creates a sell pool on the EP with the bonding curve of their preference
+  6. Seller deposits BVs into the pool. 
+  7. Buyer approves BP to transfer exchange token 
+  8. Buyer calls `commitToOffer` passing the price (UI can simulate the price base on the chosen bonding curve), the EP address as validator and the EP buy function encoded as the proof.
+    * BP calls proof on EP contract (validator address)
+    * Check if BP received the BV, otherwise reverts (the bid failed)
+    * BP transfers the received voucher to the buyer 
+    * BP checks its own balance to see if the validator returned some funds beyond BV and forwards extra funds to the buyer
+    * Transfer minimal required funds from the seller into the escrow <br>
 
-      ```solidity
-        struct PriceDiscovery {
-          uint256 price
-          address validator // zero address or protocol address when type is Offchain
-          bytes proof // proof is validator calldata (opt 2) or an EIP712 signature (opt 1)
-        }
-      ```
+#### Seller creates a multi-instance Offer (i.e, quantity > 1) and price discovery happens in an orderbook protocol (like Seaport for example)
 
-    1.4 **Price discovery happens both on-chain/off-chain and we make BosonVoucher compatible with AMMs**
+This flow depends on how the validator works. If the validator always sends the voucher to `msg.sender` (Boson Protocol) a few additional steps are needed.  we will refer to this kind of validator as a "simple validator" (SV). If the validator allows order matching (or similar mechanism), between addresses that are not the `msg.sender` we will refer to them as an "advanced validator" (AV).
 
-      As I’ve explained in the notes, existing NFT two-side and single-side buy pools aren’t compatible with Boson Vouchers. 
-      To make it compatible with AMMs we must turn Boson Vouchers collections individual to offers - instead of sellers,
-      so the initial price for the entire vouchers in the pool is the same (the offer price).
-      This option is a combination necessary changes to Boson Vouchers and option 1.2.
+**Ask flow**
+  1. Seller creates the BP Offer (with quantity > 1) [tx]
+  2. Seller preMints the vouchers [tx] <br>
+   *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if the offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
+  3. Seller Funds the Seller Pool [tx]
+  4. Buyer approves [tx] <br>
+      * protocol to transfer the funds if validator is SV
+      * validator to transfer the funds if validator is AV
+  5. buyer calls `commitToOffer`/`sequentialCommitToOffer, the protocol then`: [tx]  
+      * if the validator is SV: (skip these steps otherwise) <br>
+           * transfers buyers' funds to protocol 
+           * approves validator to transfer protocol's funds 
+      * stores information about the price in the protocol
+      * calculates the amount to go in the escrow (full price in case of initial commit; and    minimal escrow in case of sequential commit)
+      * makes a call to `validator` with `proof` as calldata. Continue only if it succeeds.
+      * if validator is SV:
+          * transfers voucher to buyer
+      * if validator is AV:
+         * makes sure buyer is the owner of the voucher, otherwise revert
+         * checks BP balance to see if validator returned some funds (both with SV and AV)
+         * transfer minimal required funds from the seller into the escrow
 
-      - **Pros**:
-        - Support existing AMMs
-      - **Cons**:
-        - breaking change for existing BVs
+**Bid flow**
+  1. Seller creates the BP Offer (with quantity > 1) [tx]
+  2. Seller preMints the vouchers  [tx] <br>
+  *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if the offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
+  3. Buyer creates a bid offer on validator 
+     * with protocol as the seller, if validator is SV
+     * normally, if validator is AV
+  4. if validator is SV: 
+     * seller approves protocol to transfer the voucher (this step could potentially be skipped since we could use the access controller contract to give the protocol privilege to transfer voucher without owner's approval [this is still up for discussion]) [tx]
+  5. if validator is AV:
+     * seller approves validator to transfer the voucher [tx]
+  6. Seller funds the Seller Pool
+  7. Seller (or somebody authorized) calls `commitToOffer`/`sequentialCommitToOffer` with the bid price, the protocol then: [tx] 
+      * stores information about the price within the protocol
+      * calculates amount to go in the escrow (full price in case of initial commit; and minimal escrow in case of sequential commit)
+      * makes a call to the validator with proof as calldata. Continue only if it succeeds.
+      * if validator is SV:
+         * keep the minimum amount in the escrow and transfer the remainder to seller
+      * if validator is AV:
+          * make sure buyer is owner of the voucher, otherwise, revert
+      * checks BP balance to see if validator returned some funds (both with SV and AV)
+      * transfers minimal required funds from the seller into the escrow
 
-2. **Price discovery happens on-chain and transaction start externally to protocol:**
-
-    `commitToOffer`/`sequentialCommitToOffer` accepts a new parameter `price`. Externally price discovery solutions must 
-    call protocol `commitToOffer`/`sequentialCommitToOffer` with the price.
-    Protocol must check if the buyer received the voucher and the seller receives the exchange tokens (reverts otherwise).
-    
-    The UX depends on the PD solution mechanism, as the protocol call happens internally. 
-
-  - **Pros**:
-    * no need to start the transaction on protocol
-    * no development complexity on protocol side
-  - **Cons**:
-    * incompatible with all existing PD solutions, must create new solutions compatible with protocol
-
-
-### Options comparation
-
-|  | compatible with existing solutions | development complexity | UX |
-|---|---|---|---|
-| Opt 1.1  | only off-chain solutions | 🟢 | 1 sign + 2 tx |
-| Opt 1.2 | except existing AMMs (2-side and buy pools)| 🟡 | 3 tx |
-| Opt 1.3 | except existing AMMs (2-side and buy pools) | 🟡 | 3 tx or 1 sign + 2 tx |
-| Opt 1.4 | compatible | 🔴 | 3 tx
-| Opt 2 | incompatible | 🟢 | depends on the PD solution design
+Note that to make this bid flow work, we must allow third-parties the ability to call `commitToOffer` on behalf of the buyer.
 
 ## Rationale
-/
+The aforementioned price discovery techniques are widely accepted within the industry as current standards. Our interface has the capability to incorporate any external protocols that utilize these established techniques. As an example, we have described a minimal integration between Boson Protocol and Seaport.
+
+1. Seller creates a BP Offer. Let's say the offer has quantity = 1000, token is USDC, and the price here is set to 0 (0 being a magic number, as the protocol must know this is not a free offer) because the price discovery will happen via Seaport.
+
+  ```javascript
+  offer {
+    ...
+    exchangeToken: USDC address
+    quantityAvailable: 1000
+    type: OfferType.PriceDiscovery
+    price: 0
+  }
+  offerDates: {
+    ...
+    validFrom: 02/06/2023
+    validUntil: 02/06/2024
+  }
+  ```
+2. Seller preMints 1000 vouchers. 
+3. Seller approves protocol to transfer USDC
+4. Seller approves Seaport to transfer preMinted BVs
+5. Seller creates an Order on Seaport with the following fields:
+
+  ```javascript
+    {
+      offer:
+        {
+          itemType: 2 // ERC721
+          token: BV address
+          identifierOrCriteria: the voucher id // check if Seaport has a batch function
+          startAmount: 1
+          endAmount:1
+        }
+      consideration: {
+        itemType: 1 // ERC20
+        token: USDC address
+        identifierOrCriteria: 0
+        startAmount: 10
+        endAmount: 100 // The initial price will be 10 and 100 is the price at the moment the 
+                       // offer expires, realised amount is calculated linearly based on the time 
+                       // elapsed since the order became active.
+      }
+      startTime: protocol offerDates.validFrom
+      endtime: protocol offerDates.validUntil
+      ...
+    }
+  ```
+6. Buyer approves protocol to transfer USDC
+7. Buyer calls `commitToOffer` which the following fields:
+
+```javascript
+const basicOrderParameters = {
+ considerationToken: USDC,
+ considerationAmount: startAmount * t,
+ offerer: seller address,
+ offerToken: BV,
+ offerAmount: 1, 
+ ...
+}
+
+const priceDiscovery = {
+  price: startAmount * t
+  validator: seaport address
+  proof: encodeFunctionData("fulfillBasicOrder", basicOrderParameters)
+}
+
+commitToOffer(..., priceDiscovery)
+```
+
+### Notes
+Note that 2-side AMM pools are out of the scope of this BPIP as they would either require us to make changes to the Boson Voucher, or they would require us to develop an intermediate token. Although this is interesting, it is out of the scope of this proposal. 
 
 ## Backward compatibility
 
-/
+This proposed improvement to the protocol is fully backward compatible, we would still support fixed price offers and maintain the existing interfaces
+
+All of the methods described here would be compatible with the current Boson Vouchers. 
 
 ## Implementation
-
 
 /
 
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+
+
+
