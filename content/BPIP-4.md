@@ -26,13 +26,15 @@ The proposal is to add an additional input field in the form of a new struct `pr
   ```solidity
   struct PriceDiscovery {
     uint256 price
-    address validator
-    bytes proof 
+    address priceDiscoveryContract
+    bytes priceDiscoveryData
   }
 ```
 
-The intention is that `validator` is an external price discovery contract and the proof is a function that the protocol will call on the validator contract before allowing a buyer to commit to an Offer. For example, the validator could be an AMM router, and the buyer would have to provide a proof to the validator, if the proof call succeeds, then `commitToOffer` would also succeed, otherwise, it would revert. . 
-    
+The intention is that `priceDiscoveryContract` is an external contract and the `priceDiscoveryData` is a function that the protocol will call on the `priceDiscoveryContract` before allowing a buyer to commit to an Offer. For example, the `priceDiscoveryContract`
+could be an AMM router, and the buyer would have to provide a function call encoded as bytes (`priceDiscoveryData` parameter) which exists on the AMM router contract (`priceDiscoveryContract`). The protocol then calls this function internally, 
+if the call succeeds, then `commitToOffer` would also succeed, otherwise, it would revert. . 
+
 ### Examples: 
 
 #### Single Offer example <br>
@@ -40,18 +42,18 @@ The intention is that `validator` is an external price discovery contract and th
 
 **Steps:**
   1. Seller creates an Offer in BP (with quantity = 1) [tx]
-  2. Seller Funds the Seller Pool [tx]
+  2. Seller funds the Seller Pool [tx]
   3. Seller preMints the offer voucher [tx] <br>
        *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
   4. Seller chooses an external auction protocol of their preference, External Protocol (EP)
   5. Seller creates an auction on the EP.<br>
   6. Seller gives permission for EP to transfer the voucher  
   7. buyer approves BP to transfer exchange token
-  8. Buyer calls `commitToOffer` passing the bid price, the EP address as validator and the EP bid function encoded as the proof.<br>
-      * BP call proof on EP contract (validator address)
+  8. Buyer calls `commitToOffer` passing the bid price, the EP address as priceDiscoveryContract and the EP bid function encoded as the priceDiscoveryData.<br>
+      * BP call priceDiscoveryData on EP contract (priceDiscoveryContract address)
       * Check if protocol received the BV, otherwise reverts (the bid failed)
       * BP transfers the received voucher to the buyer 
-      * BP checks its own balance to see if the validator returned some funds beyond BV and forwards extra funds to the buyer
+      * BP checks its own balance to see if the priceDiscoveryContract returned some funds beyond BV and forwards extra funds to the buyer
       * Transfer minimal required funds from the seller into the escrow
 
 #### An example of a multi-instance Offer (i.e, quantity > 1). <br>
@@ -59,67 +61,69 @@ The intention is that `validator` is an external price discovery contract and th
 
 **Steps:**
   1. Seller creates the BP Offer (with quantity > 1) [tx]
-  2.  Seller Funds the Seller Pool [tx]
+  2.  Seller funds the Seller Pool [tx]
   3. Seller preMint the vouchers [tx] <br>
      *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
   4. Seller chooses an external AMM protocol of their preference, External Protocol (EP)
   5. Seller creates a sell pool on the EP with the bonding curve of their preference
   6. Seller deposits BVs into the pool. 
   7. Buyer approves BP to transfer exchange token 
-  8. Buyer calls `commitToOffer` passing the price (UI can simulate the price base on the chosen bonding curve), the EP address as validator and the EP buy function encoded as the proof.
-    * BP calls proof on EP contract (validator address)
-    * Check if BP received the BV, otherwise reverts (the bid failed)
-    * BP transfers the received voucher to the buyer 
-    * BP checks its own balance to see if the validator returned some funds beyond BV and forwards extra funds to the buyer
-    * Transfer minimal required funds from the seller into the escrow <br>
+  8. Buyer calls `commitToOffer` passing the price (UI can simulate the price base on the chosen bonding curve), the EP address as priceDiscoveryContract and the EP buy function encoded as the priceDiscoveryData. <br>
+      * BP calls priceDiscoveryData on EP contract (priceDiscoveryContract address)
+      * Check if BP received the BV, otherwise reverts (the bid failed)
+      * BP transfers the received voucher to the buyer 
+      * BP checks its own balance to see if the priceDiscoveryContract returned some funds beyond BV and forwards extra funds to the buyer
+      * Transfer minimal required funds from the seller into the escrow <br>
 
 #### Seller creates a multi-instance Offer (i.e, quantity > 1) and price discovery happens in an orderbook protocol (like Seaport for example)
 
-This flow depends on how the validator works. If the validator always sends the voucher to `msg.sender` (Boson Protocol) a few additional steps are needed.  we will refer to this kind of validator as a "simple validator" (SV). If the validator allows order matching (or similar mechanism), between addresses that are not the `msg.sender` we will refer to them as an "advanced validator" (AV).
+The flow of the protocol depends on how the `priceDiscoveryContract` works. If it always sends the voucher to msg.sender (Boson Protocol), additional steps are necessary. 
+We refer to this type of orderbook as a "Fulfill Orderbook" (FO). If the `priceDiscoveryContract` allows order matching (or similar mechanism) between addresses that are not the msg.sender,
+we call it an "Match Orderbook" (MO). Note that the idea of MO was inspired by Seaport's matching feature.
 
 **Ask flow**
   1. Seller creates the BP Offer (with quantity > 1) [tx]
   2. Seller preMints the vouchers [tx] <br>
    *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if the offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
-  3. Seller Funds the Seller Pool [tx]
+  3. Seller funds the Seller Pool [tx]
   4. Buyer approves [tx] <br>
-      * protocol to transfer the funds if validator is SV
-      * validator to transfer the funds if validator is AV
+      * protocol to transfer the funds if `priceDiscoveryData` is FO
+      * priceDiscoveryContract to transfer the funds if `priceDiscoveryData` is MO
   5. buyer calls `commitToOffer`/`sequentialCommitToOffer, the protocol then`: [tx]  
-      * if the validator is SV: (skip these steps otherwise) <br>
+      * if the `priceDiscoveryData` is FO: (skip these steps otherwise) <br>
            * transfers buyers' funds to protocol 
-           * approves validator to transfer protocol's funds 
+           * approves `priceDiscoveryContract` to transfer protocol's funds 
       * stores information about the price in the protocol
-      * calculates the amount to go in the escrow (full price in case of initial commit; and    minimal escrow in case of sequential commit)
-      * makes a call to `validator` with `proof` as calldata. Continue only if it succeeds.
-      * if validator is SV:
+      * calculates the amount to go in the escrow (full price in case of initial commit; and minimal escrow in case of sequential commit)
+      * makes a call to `priceDiscoveryContract` with `priceDiscoveryData` as calldata. Continue only if it succeeds.
+      * if `priceDiscoveryData` is FO:
           * transfers voucher to buyer
-      * if validator is AV:
+      * if `priceDiscoveryData` is MO:
          * makes sure buyer is the owner of the voucher, otherwise revert
-         * checks BP balance to see if validator returned some funds (both with SV and AV)
+         * checks BP balance to see if `priceDiscoveryContract` returned some funds (both with FO and MO)
          * transfer minimal required funds from the seller into the escrow
 
 **Bid flow**
   1. Seller creates the BP Offer (with quantity > 1) [tx]
   2. Seller preMints the vouchers  [tx] <br>
   *Note that we will adapt BV to not call commitToPreMintedOffer when transferring the voucher if the offer has price discovery enabled (transfer will happen internally when a buyer calls commitToOffer)*
-  3. Buyer creates a bid offer on validator 
-     * with protocol as the seller, if validator is SV
-     * normally, if validator is AV
-  4. if validator is SV: 
+  3. Buyer creates a bid offer on `priceDiscoveryContract`
+     * with protocol as the seller, if `priceDiscoveryData` is FO
+     * normally, if `priceDiscoveryData` is MO
+  4. if `priceDiscoveryData` is FO: 
      * seller approves protocol to transfer the voucher (this step could potentially be skipped since we could use the access controller contract to give the protocol privilege to transfer voucher without owner's approval [this is still up for discussion]) [tx]
-  5. if validator is AV:
-     * seller approves validator to transfer the voucher [tx]
+  5. if `priceDiscoveryData` is MO:
+     * seller approves `priceDiscoveryContract` to transfer the voucher [tx]
   6. Seller funds the Seller Pool
   7. Seller (or somebody authorized) calls `commitToOffer`/`sequentialCommitToOffer` with the bid price, the protocol then: [tx] 
       * stores information about the price within the protocol
       * calculates amount to go in the escrow (full price in case of initial commit; and minimal escrow in case of sequential commit)
-      * makes a call to the validator with proof as calldata. Continue only if it succeeds.
-      * if validator is SV:
+      * makes a call to the `priceDiscoveryContract` with `priceDiscoveryData` as calldata. Continue only if it succeeds.
+      * if `priceDiscoveryData` is FO:
          * keep the minimum amount in the escrow and transfer the remainder to seller
-      * if validator is AV:
+      * if `priceDiscoveryData` is MO:
           * make sure buyer is owner of the voucher, otherwise, revert
-      * checks BP balance to see if validator returned some funds (both with SV and AV)
+      * checks BP balance to see if `priceDiscoveryContract` returned some funds (both with FO and MO)
       * transfers minimal required funds from the seller into the escrow
 
 Note that to make this bid flow work, we must allow third-parties the ability to call `commitToOffer` on behalf of the buyer.
@@ -187,8 +191,8 @@ const basicOrderParameters = {
 
 const priceDiscovery = {
   price: startAmount * t
-  validator: seaport address
-  proof: encodeFunctionData("fulfillBasicOrder", basicOrderParameters)
+  priceDiscoveryContract: seaport address
+  priceDiscoveryData: encodeFunctionData("fulfillBasicOrder", basicOrderParameters)
 }
 
 commitToOffer(..., priceDiscovery)
@@ -205,7 +209,9 @@ All of the methods described here would be compatible with the current Boson Vou
 
 ## Implementation
 
-/
+### Security considerations
+
+Given the nature of smart contracts we might want gate which price discovery contracts can be used
 
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
