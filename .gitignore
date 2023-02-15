@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+
+# IntelliJ IDEA
+*.iml
+*.iws
+*.ipr
+.idea/**
+
+# VSCode IDE
+.vscode/
+
