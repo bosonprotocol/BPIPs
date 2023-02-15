@@ -79,7 +79,7 @@ if the call succeeds, then `commitToOffer` would also succeed, otherwise, it wou
 
 The flow of the protocol depends on how the `priceDiscoveryContract` works. If it always sends the voucher to msg.sender (Boson Protocol), additional steps are necessary. 
 We refer to this type of orderbook as a "Fulfill Orderbook" (FO). If the `priceDiscoveryContract` allows order matching (or similar mechanism) between addresses that are not the msg.sender,
-we call it an "Match Orderbook" (MO). Note that the idea of MO was inspired by Seaport's matching feature.
+we call it an "Match Orderbook" (MO). Note that the idea for MO was inspired by Seaport's matching feature. To make it work with the protocol, MO must implement an interface which return the price - we may want to propose an EIP for price discovery. 
 
 **Ask flow**
   1. Seller creates the BP Offer (with quantity > 1) [tx]
