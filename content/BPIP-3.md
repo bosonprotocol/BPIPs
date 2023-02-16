@@ -32,15 +32,18 @@ The following methods are added.
      * - Range length is zero
      * - Range length is too large, i.e., would cause an overflow
      * - Offer id is already associated with a range
+     * - _to is not the contract address or the contract owner
      *
      * @param _offerId - the id of the offer
      * @param _start - the first id of the token range
      * @param _length - the length of the range
+     * @param _to - the address to send the pre-minted vouchers to (contract address or contract owner)
      */
     function reserveRange(
         uint256 _offerId,
         uint256 _start,
-        uint256 _length
+        uint256 _length,
+        address _to
     ) external;
 
     /**
@@ -63,7 +66,7 @@ The following methods are added.
      * causing the token range to be reserved, but only pre-minting
      * a certain amount monthly.
      *
-     * Caller must be contract owner (seller operator address).
+     * Caller must be contract owner (seller assistant address).
      *
      * Reverts if:
      * - Offer id is not associated with a range
@@ -89,7 +92,7 @@ The following methods are added.
      * this method can be called multiple times, until the whole
      * range is burned.
      *
-     * Caller must be contract owner (seller operator address).
+     * Caller must be contract owner (seller assistant address).
      *
      * Reverts if:
      * - Offer id is not associated with a range
@@ -189,9 +192,9 @@ These methods are not essential for this BPIP, so full specification is not prov
 ![Pre-minted Vouchers Interactions Diagram](./assets/bpip-3/Preminted-Vouchers-Diagram.png "Pre-minted Voucher Sequences Diagram")
 
 ## Rationale
-Vouchers, which are ERC721 NFTs show on marketplaces as soon as they are minted. Currently vouchers are minted at the same time when exchange is created, which means that whenever they are resold on secondary market, new buyer does not get full dispute period (i.e. transfer does not reset the timers in the protocol). In order to allow buyers on any marketplace to get full dispute period when they are the first owner of the voucher, we need a different solution. 
+Vouchers, which are ERC721 NFTs show on marketplaces as soon as they are minted. Currently vouchers are minted at the same time when exchange is created, which means that whenever they are resold on secondary market, new buyer does not get full redemption period (i.e. transfer does not reset the timers in the protocol). In order to allow buyers on any marketplace to get full dispute period when they are the first owner of the voucher, we need a different solution. 
 
-One possible approach is to create a dedicated bridge contract, where sellers could create NFTs which would show on marketplaces. When buyers on marketplace bought them, this bridge NFT would be burnt and buyers would get redeemable voucher instead. However this approach breaks user flow in some marketplace and might be questionable since buyer gets a different NFT that was actually bought.
+One possible approach is to create a dedicated bridge contract, where sellers could create NFTs which would show on marketplaces. When buyers on marketplace bought them, this bridge NFT would be burnt and buyers would get redeemable voucher instead. However this approach breaks user flow in some marketplace and might be questionable since buyer gets a different NFT that was actually bought. This challenges current marketplace UX and was deemed to potentially be confusing to buyer of said redeemable.
 
 Another approach was to enable mint on demand directly on voucher contract. Although it does not suffer from the same limitations than previous approach, mint is not standard ERC721 function, so compatibility with all marketplaces would be hard to achieve.
 
@@ -200,7 +203,7 @@ Important to note here is that we now have two types of voucher in the voucher c
 - preminted vouchers, with no exchange associated and
 - true vouchers, with exactly one exchange associated.
   
-In current protocol, all vouchers are issued when protocol invokes `issueVoucher` method. In this proposal we add additional method `preMint` which allows seller (operator) to issue a desired number of vouchers.
+In current protocol, all vouchers are issued when protocol invokes `issueVoucher` method. In this proposal we add additional method `preMint` which allows seller (assistant) to issue a desired number of vouchers.
 Since currently it holds that exchange id (in protocol) always matches token id (in voucher contract), it's desired that this stays even with premint. To achieve it, we propose a method to reserve range (`reserveRange`), which effectively reserves a desired number of exchange ids in the protocol. Then whenever a preminted voucher is converted into a true voucher, it keeps its token id and gets matching exchange id in the protocol.
 
 Although range reservation ultimately happens on voucher contract, method must be invoked true the protocol. That way it can be ensured that the amount of preminted vouchers never exceeds quantity available, set in the offer.
@@ -222,6 +225,7 @@ Still it is important that when upgrade is done voucher contracts are upgraded b
 * Range reservation
   * Must be done before preminting can happen.
   * Ranges must be strictly increasing, i.e. start of new range must be greater than current highest range.
+  * Range's owner (parameter `_to`) must be either the voucher contract itself or its owner.
   * Store information about associated offer id, range start and range length.
   * The tracking of reserved ranges enables that exchange id (in protocol) and token id (voucher contract) can remain the same.
 * Preminting
