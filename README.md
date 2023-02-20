@@ -17,5 +17,6 @@ As these are vastly different changes, the process for each is a bit different. 
 
 * [BPIP-2](/content/BPIP-2.md), Kleros Integration as Dispute Resolver
 * [BPIP-3](/content/BPIP-3.md), Pre-minted Vouchers (Shell rNFTs)
+* [BPIP-4](/content/BPIP-4.md), Support price discovery
 
 _Also check [PRs](https://github.com/bosonprotocol/BPIPs/pulls) to see proposals in progress._
