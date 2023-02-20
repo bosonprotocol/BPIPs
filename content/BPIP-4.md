@@ -8,11 +8,11 @@ created: 2023-01-25
 
 ## Abstract
 
-This proposal defines an Interface that extends the protocol to enable price discovery. The changes proposed will allow Sellers to pick their price discovery method of choice so that they can leverage external price discovery mechanisms. .
+This proposal defines an Interface that extends the protocol to enable price discovery. The changes proposed will allow Sellers to pick their price discovery method of choice so that they can leverage external Price Discovery mechanisms.
 
 ## Motivation
 
-Currently, BP doesn't support price discovery. The price is currently represented as a uint256 within the Offer struct which is set by the Seller at Offer creation time. We see a need for Sellers to be able to use the protocol to leverage a price discovery system that will in turn discover the best price for their Offers. We believe this would be a key driver for adoption. There are several well-established price discovery mechanisms available both on-chain and off-chain on the market, such as Automated Market Makers (AMMs), auction systems, and order books. Making BP compatible with these mechanisms would open up an entirely new world of opportunity, such as allowing sellers to utilise AMMs for market-driven pricing, create auctions for exclusive items, and support 24/7 orderbooks for physical items.
+Currently, Boson Protocol (BP) doesn't support price discovery. The price is currently represented as a `uint256` within the Offer struct which is set by the Seller at Offer creation time. We see a need for Sellers to be able to use the protocol to leverage a price discovery system that will in turn discover the best price for their Offers. We believe this would be a key driver for adoption. There are several well-established price discovery mechanisms available both on-chain and off-chain on the market, such as Automated Market Makers (AMMs), auction systems, and order books. Making BP compatible with these mechanisms would open up an entirely new world of opportunity, such as allowing sellers to utilise AMMs for market-driven pricing, create auctions for exclusive items, and support 24/7 orderbooks for physical items.
 
 
 ## Specification 
@@ -208,6 +208,9 @@ This proposed improvement to the protocol is fully backward compatible, we would
 All of the methods described here would be compatible with the current Boson Vouchers. 
 
 ## Implementation
+
+We have decided that our next step should be to look at some price discovery protocols like Seaport, a16z's auctions, sudoswap's AMM, and build POCs for them. 
+This will not only help us validate our interface but also demonstrate its capabilities and potential.
 
 ### Security considerations
 
