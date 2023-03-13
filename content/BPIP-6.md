@@ -100,8 +100,8 @@ This specification has an impact on previous protocol versions.
 - All [methods that create an offer](#ibosonofferhandler-and-ibosonorchestrationhandler) have a different input parameter, so old methods won't work anymore.
 - Need to investigate how existing collection data will be affected.
 
-## ImplementationImplementation details are not known yet.
-
+## Implementation
+Implementation details are not known yet.
   
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
