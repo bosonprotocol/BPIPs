@@ -40,7 +40,7 @@ In this BPIP we propose to allow creating multiple collections for a single sell
     }
 ```
 
-#### IBosonOfferEvents
+#### IBosonAccountEvents
 The following event is added.
 ```solidity
     event CollectionCreated(
@@ -51,7 +51,7 @@ The following event is added.
     );
 ```
 
-#### IBosonOfferHandler
+#### IBosonAccountHandler
 The following methods are added.
 ```solidity
 /**
