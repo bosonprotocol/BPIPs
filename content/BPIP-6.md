@@ -25,49 +25,48 @@ In this BPIP we propose to allow creating multiple collections for a single sell
 `Offer` is extended with an additional field
 
 ```diff solidity
-    struct Offer {
-        uint256 id;
-        uint256 sellerId;
-        uint256 price;
-        uint256 sellerDeposit;
-        uint256 buyerCancelPenalty;
-        uint256 quantityAvailable;
-        address exchangeToken;
-        string metadataUri;
-        string metadataHash;
-        bool voided;
-+       uint256 collectionIndex;
-    }
+struct Offer {
+    uint256 id;
+    uint256 sellerId;
+    uint256 price;
+    uint256 sellerDeposit;
+    uint256 buyerCancelPenalty;
+    uint256 quantityAvailable;
+    address exchangeToken;
+    string metadataUri;
+    string metadataHash;
+    bool voided;
++   uint256 collectionIndex;
+}
 ```
 
 #### IBosonAccountEvents
 The following event is added.
 ```solidity
-    event CollectionCreated(
-        uint256 indexed sellerId,
-        uint256 collectionIndex,
-        address collectionAddress,
-        string indexed externalId
-    );
+event CollectionCreated(
+    uint256 indexed sellerId,
+    uint256 collectionIndex,
+    address collectionAddress,
+    string indexed externalId
+    address indexed executedBy
+);
 ```
 
 #### IBosonAccountHandler
 The following methods are added.
 ```solidity
 /**
-     * @notice Creates a new seller collection.
-     *
-     * Emits a CollectionCreated event if successful.
-     *
-     *  Reverts if:
-     *  - The offers region of protocol is paused
-     *  - Seller does not exist
-     *  - Caller is not the seller admin
-     *  - Caller does not own auth token
-     *
-     * @param _externalId - external collection id
-     */
-    function createNewCollection(string calldata _name) external;
+ * @notice Creates a new seller collection.
+ *
+ * Emits a CollectionCreated event if successful.
+ *
+ *  Reverts if:
+ *  - The offers region of protocol is paused
+ *  - Caller is not the seller assistant
+ *
+ * @param _externalId - external collection id
+ */
+    function createNewCollection(string calldata _externalId, string calldata _contractURI) external;
 ```
 
 #### IBosonOfferHandler and IBosonOrchestrationHandler
