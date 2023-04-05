@@ -11,12 +11,16 @@ created: 2023-03-21
 This proposal describes a new feature that provides buyer protection on secondary market sales and enforces perpetual on-chain royalties.
 
 ## Motivation
-When a buyer commits to an offer in Boson Protocol, they get buyer protection - either they get the purchased item or they get financially compensated if the seller does not deliver. The maximum compensation they can get is the sum of the item price and seller's deposit.
-Buyer is also free to resell the voucher on a secondary marketplace, presumably for a higher price. When that happens, the protocol is not aware of it and no additional funds are put in the escrow. If the original seller fails to deliver, the maximum financial compensation is still only the original item price plus the seller deposit. If the secondary price was higher than that, the last buyer cannot get everything back. In general, we can say that secondary buyers do not get the same protection as primary buyers.
+When a buyer commits to an offer in Boson Protocol, they get buyer protection - either they get the purchased item or they get financially compensated if the seller does not deliver. The maximum compensation they can get is the sum of the item price and the seller's deposit.
+Buyer is also free to resell the voucher on a secondary marketplace, presumably for a higher price. When that happens, the protocol is not aware of it and no additional funds are put in the escrow. If the original seller fails to deliver, the maximum financial compensation is still only the original item price plus the seller deposit. If the secondary price was higher than that, the last buyer cannot get everything back. In general, we can say that secondary buyers do not get the same protection as primary buyers.  
 
-To overcome this we propose a change to the protocol, where during each sequential commit, additional funds get locked in the escrow. Only when the exchange is finalized resellers get fully paid out depending on the final exchange state. For example, if an exchange is normally completed, every reseller gets their net profit at the end. However, if the original seller revokes the voucher, resellers don't get any profit, but they also don't lose anything. This kind of system ensures protection for all involved parties. 
+To overcome this we propose a change to the protocol, where during each sequential commit, additional funds get locked in the escrow. Only when the exchange is finalized do resellers get fully paid out depending on the final exchange state. For example, if an exchange is normally completed, every reseller gets their net profit at the end. However, if the original seller revokes the voucher, resellers don't get any profit, but they also don't lose anything. This kind of system ensures protection for all involved parties. 
 
-The proposed system is also designed to be time-capital efficient, i.e. amount kept in escrow is the minimal needed to cover any final payouts. Since multiple different scenarios exist, which have different outcomes, we prepared a detailed explanation of the system with examples for all possible scenarios. PDF document is [available here](./assets/../assets/bpip-7/Sequential%20Commit.pdf).
+This system should also work if the secondary price is equal to or lower than the previous price. In this case, no additional funds are locked during the sequential commit, reseller just gets paid out the secondary price. If the exchange is completed normally, the reseller does not get any additional payout, but if it ends in a revoked or cancelled state, the reseller is reimbursed for their loss (their net profit is 0).  
+
+Sequential commit is not limited to one secondary sale but can be performed multiple times for the same voucher. In any subsequent sale, the last price is used as the reference point to determine how much must be put into the escrow based on a new price.  
+
+The proposed system is also designed to be time-capital efficient, i.e. amount kept in escrow is the minimal needed to cover any final payouts. Since multiple different scenarios exist, which have different outcomes, we prepared a detailed explanation of the system with examples for all possible scenarios. A PDF document is [available here](./assets/../assets/bpip-7/Sequential%20Commit.pdf).
 
 Since sequential commit in fact represents secondary market exchange, it will at the same time implement two other features, proposed for the Boson protocol:
 - [Price discovery](BPIP-4.md), which will allow compatibility with the generic price discovery mechanism
@@ -28,7 +32,7 @@ A new facet `SequentialCommitFacet` is added. It implements the following method
 
 ```solidity
     /**
-     * @notice Commits to an existing exchange. Price discovery is oflaoaded to external contract.
+     * @notice Commits to an existing exchange. Price discovery is offloaded to external contract.
      *
      * Emits a BuyerCommitted event if successful.
      * Transfers voucher to the buyer address.
@@ -50,7 +54,7 @@ A new facet `SequentialCommitFacet` is added. It implements the following method
      *   - Calling transferFrom on token fails for some reason (e.g. protocol is not approved to transfer)
      *   - Received ERC20 token amount differs from the expected value
      *   - Protocol does not receive the voucher
-     *   - Transfer of voucher to the buyer fails for some reasong (e.g. buyer is contract that doesn't accept voucher)
+     *   - Transfer of voucher to the buyer fails for some reason (e.g. buyer is contract that doesn't accept voucher)
      *   - Reseller did not approve protocol to transfer exchange token in escrow
      * - Call to price discovery contract fails
      * - Protocol fee and royalties combined exceed the secondary price
