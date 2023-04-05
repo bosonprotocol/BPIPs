@@ -22,6 +22,9 @@ Additional motivation to change royalties is compatibility with https://royaltyr
 To achieve this we propose to move royalties management from the Boson voucher into the Boson protocol, which will enable both more flexible royalties and full compatibility with Royalty Registry.
 
 ## Specification
+#### Glossary
+**bps**: basis points. A basis point is a unit of measure for percentages and equals 0.01%. Since EVM does not have a float or decimal type, percentages are stored in bps, for example, 23.55% is stored as 2355. The bps range is between 0 and 10,000, representing 0 and 100% respectively.
+
 #### BosonTypes
 The following structs are added.
 ```solidity
@@ -33,7 +36,7 @@ The following structs are added.
 
     struct RoyaltyInfo {
         address payable[] recipients;
-        uint256[] bps;
+        uint256[] bps; // basis points
     }
 ```
 And `Offer` is extended with an additional field
@@ -152,9 +155,9 @@ The following methods are added.
      *
      * EIP2981 supports only 1 recipient, there fore this method defaults to treasury address.
      * This method is not exactly compliant with EIP2981, since it does not accept `salePrice` and does not return `royaltyAmount,
-     * but it rather returns `royaltyPercentage` which is the sum of all bps (exchange can have multiple reoyalty recipients).
+     * but it rather returns `royaltyPercentage` which is the sum of all bps (exchange can have multiple royalty recipients).
      *
-     * This function is meant to be primarly used by boson voucher client, which implements EIP2981.
+     * This function is meant to be primarily used by boson voucher client, which implements EIP2981.
      *
      * Reverts if exchange does not exist.
      *
