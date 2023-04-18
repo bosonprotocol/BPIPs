@@ -3,7 +3,7 @@ bpip: 3
 title: Pre-minted Vouchers (Shell rNFTs)
 author: Cliff Hall
 discussions-to: https://github.com/bosonprotocol/BPIPs/issues/3
-status: Living
+status: Review
 created: 2022-11-22
 ---
 
