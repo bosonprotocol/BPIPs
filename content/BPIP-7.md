@@ -3,7 +3,7 @@ bpip: 7
 title: Sequential Commit
 authors: Jonas Seiferth, Justin Banon, Aditya Asgaonkar, Mischa Tuffield, Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/17
-status: Draft
+status: Review
 created: 2023-03-21
 ---
 
@@ -24,7 +24,7 @@ The proposed system is also designed to be time-capital efficient, i.e. amount k
 
 Since sequential commit in fact represents secondary market exchange, it will at the same time implement two other features, proposed for the Boson protocol:
 - [Price discovery](BPIP-4.md), which will allow compatibility with the generic price discovery mechanism
-- Perpetual royalties, based on [BPIP-5](https://github.com/bosonprotocol/BPIPs/pull/12). At finalization time, all royalties will be paid out to recipients assigned to the offer.
+- Perpetual royalties, based on [BPIP-5](BPIP-5.md). At finalization time, all royalties will be paid out to recipients assigned to the offer.
 
 ## Specification
 #### SequentialCommitFacet
@@ -72,7 +72,7 @@ A new facet `SequentialCommitFacet` is added. It implements the following method
 ```
 
 #### Changes in other faces
-No other interfaces are changed. Reference implementation might include other changes, but they are the result of changes proposed in other BPIPs ([Price discovery](BPIP-4.md), [Royalties](https://github.com/bosonprotocol/BPIPs/pull/12))
+No other interfaces are changed. Reference implementation might include other changes, but they are the result of changes proposed in other BPIPs ([Price discovery](BPIP-4.md), [Royalties](BPIP-5.md))
 
 ## Rationale
 A new method is needed to distinguish between the initial commit (when only `offerId` is relevant) and the sequential commit where `exchangeId` is the relevant indicator. Sequential commit's main effects are voucher ownership transfer and locking up additional funds. This does not affect other actions such as redeeming, canceling or revoking the voucher or raising the dispute. It does affect how funds are released at finalization time, but it does not affect public functions. Withdrawal of released funds remains the same as it was.
