@@ -38,7 +38,7 @@ BPIP editors will pick up new proposals, check the syntax, do sanity checks and 
 
 Current editors in alphabetical order: Aditya Asgaonkar, Cliff Hall, Gregor Borosa, Mischa Tuffield, Justin Banon.
 
-BPIP editors meet on ad hoc basis to discuss and action on the backlog of BPIPs. A high quorum is required of 4/5, while voting decisions require 2/3 supermajority. Meeting minutes are recorded in a [public log](./content/BPIP-editors-call-log.md).
+Voting requires a majority of votes.
 
 > Note that smart contracts might have assigned admin/upgrader roles that may or may not be the same as these editors.
 
