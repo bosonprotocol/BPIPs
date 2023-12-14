@@ -158,7 +158,7 @@ The following methods are added.
      * This method is not exactly compliant with EIP2981, since it does not accept `salePrice` and does not return `royaltyAmount,
      * but it rather returns `royaltyPercentage` which is the sum of all bps (an exchange can have multiple royalty recipients).
      *
-     * This function is meant to be primarly used by boson voucher client, which implements EIP2981.
+     * This function is meant to be primarily used by boson voucher client, which implements EIP2981.
      *
      * Reverts if exchange does not exist.
      *
