@@ -321,6 +321,20 @@ RoyaltyInfo{
   bps: [0, bps1, bps2, bps3, ...]
 }
 ```
+
+## Using with [Royalty Registry](https://royaltyregistry.xyz/)
+
+If all offers in a collection have only one royalty recipient (which can be different across offers), no further action is needed since it's automatically handled by the Royalty Registry. It handles it as EIP2981 royalty standard.
+
+However, if some offer has multiple recipients, the Royalty Registry would produce incorrect data. It first assumes that EIP2981-style royalty info exists and because the voucher contract returns the data, it does not check if additional information is available. In this case, the assistant must override the Royalty Lookup Address on Royalty Registry.
+
+To do it, they must follow the steps below:
+1. Obtain the Royalty Registry address on the same chain where the seller's collection is
+2. Call method `setRoyaltyLookupAddress` with parameters:
+   1. tokenAddress: Collection address
+   2. royaltyLookupAddress: Boson Protocol Address (`0x59A4C19b55193D5a2EAD0065c54af4d516E18Cb5` on Ethereum and Polygon. For testnet address refer to the protocol repository)
+
+This will then produce the correct results for all offers in that collection.
   
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
