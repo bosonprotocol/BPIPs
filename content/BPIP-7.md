@@ -3,7 +3,7 @@ bpip: 7
 title: Sequential Commit
 authors: Jonas Seiferth, Justin Banon, Aditya Asgaonkar, Mischa Tuffield, Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/17
-status: Last Call
+status: Final
 created: 2023-03-21
 ---
 
