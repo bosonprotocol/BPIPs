@@ -2,7 +2,7 @@
 bpip: 4
 title:  Support price discovery 
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/9
-status: Last Call 
+status: Final 
 created: 2023-01-25
 ---
 
