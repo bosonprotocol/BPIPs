@@ -1,4 +1,6 @@
-# Boson Protocol Improvement Proposals (BPIPs)
+[![banner](assets/banner.png)](https://bosonprotocol.io)
+
+<h1 align="center">Boson Protocol Improvement Proposals (BPIPs)</h1>
 
 Anyone can suggest and lead a change in Boson Protocol's technological stack through Boson Protocol Improvement Proposals (pronounced _bee-pips_). We follow a simple process that is common in web3, as described below. We welcome suggestions for tweaking it further.
 

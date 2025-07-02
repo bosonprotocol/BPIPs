@@ -3,7 +3,7 @@ bpip: 7
 title: Sequential Commit
 authors: Jonas Seiferth, Justin Banon, Aditya Asgaonkar, Mischa Tuffield, Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/17
-status: Draft
+status: Final
 created: 2023-03-21
 ---
 
@@ -24,13 +24,21 @@ The proposed system is also designed to be time-capital efficient, i.e. amount k
 
 Since sequential commit in fact represents secondary market exchange, it will at the same time implement two other features, proposed for the Boson protocol:
 - [Price discovery](BPIP-4.md), which will allow compatibility with the generic price discovery mechanism
-- Perpetual royalties, based on [BPIP-5](https://github.com/bosonprotocol/BPIPs/pull/12). At finalization time, all royalties will be paid out to recipients assigned to the offer.
+- Perpetual royalties, based on [BPIP-5](BPIP-5.md). At finalization time, all royalties will be paid out to recipients assigned to the offer.
 
 ## Specification
 #### SequentialCommitFacet
 A new facet `SequentialCommitFacet` is added. It implements the following method
 
 ```solidity
+/**
+ * @title ISequentialCommitHandler
+ *
+ * @notice Handles sequential commits.
+ *
+ * The ERC-165 identifier for this interface is: 0x34780cc6
+ */
+interface IBosonSequentialCommitHandler is BosonErrors, IBosonExchangeEvents, IBosonFundsLibEvents {
     /**
      * @notice Commits to an existing exchange. Price discovery is offloaded to external contract.
      *
@@ -58,6 +66,7 @@ A new facet `SequentialCommitFacet` is added. It implements the following method
      *   - Reseller did not approve protocol to transfer exchange token in escrow
      * - Call to price discovery contract fails
      * - Protocol fee and royalties combined exceed the secondary price
+     * - The secondary price cannot cover the buyer's cancellation penalty
      * - Transfer of exchange token fails
      *
      * @param _buyer - the buyer's address (caller can commit on behalf of a buyer)
@@ -69,10 +78,11 @@ A new facet `SequentialCommitFacet` is added. It implements the following method
         uint256 _exchangeId,
         BosonTypes.PriceDiscovery calldata _priceDiscovery
     ) external payable;
+}
 ```
 
-#### Changes in other faces
-No other interfaces are changed. Reference implementation might include other changes, but they are the result of changes proposed in other BPIPs ([Price discovery](BPIP-4.md), [Royalties](https://github.com/bosonprotocol/BPIPs/pull/12))
+#### Changes in other facets
+No other interfaces are changed. Reference implementation might include other changes, but they are the result of changes proposed in other BPIPs ([Price discovery](BPIP-4.md), [Royalties](BPIP-5.md))
 
 ## Rationale
 A new method is needed to distinguish between the initial commit (when only `offerId` is relevant) and the sequential commit where `exchangeId` is the relevant indicator. Sequential commit's main effects are voucher ownership transfer and locking up additional funds. This does not affect other actions such as redeeming, canceling or revoking the voucher or raising the dispute. It does affect how funds are released at finalization time, but it does not affect public functions. Withdrawal of released funds remains the same as it was.
@@ -86,17 +96,23 @@ This specification does not break backward compatibility.
 * Commit to sequential offer
   * Accept exchangeId as an identifier
 Similar to commit to offer, sequential commit to offer can be done on the buyer's behalf
-  * Validate that voucher exists and has not expired
-  * Pass price discovery data to price discovery contract.
-The success of a call is not enough to assume the exchange actually happened. Protocol must verify that the voucher and exchange token was sent to the correct addresses.
+  * Validate that the voucher exists and has not expired
+  * Pass price discovery data to price discovery contract client.
+The success of a call is not enough to assume the exchange actually happened. The client must verify that the voucher and exchange token were sent to the correct addresses.
 The protocol must calculate the minimal amount to go into the escrow and ensure it has been received.
   * Release the difference between the price and the minimal escrow amount to the reseller.
-  * Protocol must send any outstanding assets to the buyer or seller, depending on the offer type.
+  * The protocol must send any outstanding assets to the buyer or seller, depending on the offer type.
 The protocol stores information about the exchange (buyer id, price, fees and royalties) so they can be used during the next sequential commit or exchange finalization.
 * Releasing the funds
-  * Releasing funds for the original seller and the last buyer remains as it was.
+  * Releasing funds for the original seller remains as it was.
+  * The formulae are adapted to use the last price.
   * Additionally, loop over all sequential commits and release the difference between what was already released (during the commit) and the total payout.
 
+The current implementation is available in [v2.4.0 release candidate](https://github.com/bosonprotocol/boson-protocol-contracts/releases/tag/v2.4.0-rc.3).
+
+### Security considerations
+
+Security considerations are available in [this document](./assets/../assets/bpip-7/Sequential%20Commit.pdf).
   
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
