@@ -44,93 +44,70 @@ The interactions between mutualizer, seller and protocol are presented in the fo
 ```solidity
 /**
  * @title IDRFeeMutualizer
+ * @notice Interface for dispute resolver fee mutualization
  *
- * @notice This is the interface for the Dispute Resolver fee mutualizers.
+ * The ERC-165 identifier for this interface is: 0x1ff4f3df
  *
- * The ERC-165 identifier for this interface is: 0x41283543
+ * @dev This interface defines the core functionality for mutualizing dispute resolver fees
  */
 interface IDRFeeMutualizer {
-    event DRFeeRequsted(
-        address indexed sellerAddress,
-        address _token,
-        uint256 feeAmount,
-        address feeRequester,
-        bytes context
-    );
-
-    event DRFeeSent(address indexed feeRequester, address token, uint256 feeAmount, uint256 indexed uuid);
-    event DRFeeReturned(uint256 indexed uuid, address indexed token, uint256 feeAmount, bytes context);
-
+    event DRFeeProvided(uint256 indexed exchangeId, uint256 indexed sellerId, uint256 feeAmount);
+    event DRFeeReturned(uint256 indexed exchangeId, uint256 originalFeeAmount, uint256 returnedAmount);
+    
     /**
-     * @notice Tells if mutualizer will cover the fee amount for a given seller and requested by a given address.
-     *
-     * It checks if agreement is valid, but not if the mutualizer has enough funds to cover the fee.
-     *
-     * @param _sellerAddress - the seller address
-     * @param _token - the token address (use 0x0 for ETH)
-     * @param _feeAmount - amount to cover
-     * @param _feeRequester - address of the requester
-     * @param _context - additional data, describing the context
+     * @notice Checks if a seller is covered for a specific DR fee
+     * @param _sellerId The seller ID
+     * @param _feeAmount The fee amount to cover
+     * @param _tokenAddress The token address (address(0) for native currency)
+     * @param _disputeResolverId The dispute resolver ID (0 for universal agreement covering all dispute resolvers)
+     * @return bool True if the seller is covered, false otherwise
+     * @dev Checks for both specific dispute resolver agreements and universal agreements (disputeResolverId = 0).
      */
     function isSellerCovered(
-        address _sellerAddress,
-        address _token,
+        uint256 _sellerId,
         uint256 _feeAmount,
-        address _feeRequester,
-        bytes calldata _context
+        address _tokenAddress,
+        uint256 _disputeResolverId
     ) external view returns (bool);
 
     /**
-     * @notice Request the mutualizer to cover the fee amount.
-     *
-     * @dev Verify that seller is covered and send the fee amount to the msg.sender.
-     * Returned uuid can be used to track the status of the request.
+     * @notice Requests a DR fee for a seller
+     * @param _sellerId The seller ID
+     * @param _feeAmount The fee amount to cover
+     * @param _tokenAddress The token address (address(0) for native currency)
+     * @param _exchangeId The exchange ID
+     * @param _disputeResolverId The dispute resolver ID (0 for universal agreement)
+     * @return success True if the request was successful, false otherwise
+     * @dev Only callable by the Boson protocol. Returns false if seller is not covered.
      *
      * Reverts if:
-     * - caller is not the protocol
-     * - agreement does not exist
-     * - agreement is not confirmed yet
-     * - agreement is voided
-     * - agreement has not started yet
-     * - agreement expired
-     * - fee amount exceeds max mutualized amount per transaction
-     * - fee amount exceeds max total mutualized amount
-     * - amount exceeds available balance
-     * - token is native and transfer fails
-     * - token is ERC20 and transferFrom fails
-     *
-     * @param _sellerAddress - the seller address
-     * @param _token - the token address (use 0x0 for ETH)
-     * @param _feeAmount - amount to cover
-     * @param _context - additional data, describing the context
-     * @return isCovered - true if the seller is covered
-     * @return uuid - unique identifier of the request
+     * - Caller is not the Boson protocol
+     * - feeAmount is 0
+     * - Pool balance is insufficient
+     * - ERC20 or native currency transfer fails
      */
     function requestDRFee(
-        address _sellerAddress,
-        address _token,
+        uint256 _sellerId,
         uint256 _feeAmount,
-        bytes calldata _context
-    ) external returns (bool isCovered, uint256 uuid);
+        address _tokenAddress,
+        uint256 _exchangeId,
+        uint256 _disputeResolverId
+    ) external returns (bool success);
 
     /**
-     * @notice Return fee to the mutualizer.
+     * @notice Returns a DR fee to the mutualizer
+     * @param _exchangeId The exchange ID
+     * @param _feeAmount The amount being returned (0 means protocol kept all fees)
+     * @dev Only callable by the Boson protocol. For native currency, feeAmount must equal msg.value.
      *
-     * @dev Returned amount can be between 0 and _feeAmount that was requested for the given uuid.
-     *
-     * - caller is not the protocol
-     * - uuid does not exist
-     * - same uuid is used twice
-     * - token is native and sent value is not equal to _feeAmount
-     * - token is ERC20, but some native value is sent
-     * - token is ERC20 and sent value is not equal to _feeAmount
-     * - token is ERC20 and transferFrom fails
-     *
-     * @param _uuid - unique identifier of the request
-     * @param _feeAmount - returned amount
-     * @param _context - additional data, describing the context
+     * Reverts if:
+     * - Caller is not the Boson protocol
+     * - exchangeId is not found
+     * - msg.value != feeAmount for native currency
+     * - msg.value > 0 for ERC20 tokens
+     * - ERC20 or native currency transfer fails
      */
-    function returnDRFee(uint256 _uuid, uint256 _feeAmount, bytes calldata _context) external payable;
+    function returnDRFee(uint256 _exchangeId, uint256 _feeAmount) external payable;
 }
 ```
 
@@ -138,172 +115,168 @@ interface IDRFeeMutualizer {
 
 ```solidity
 /**
- * @title IDRFeeMutualizerClient
+ * @title DRFeeMutualizer
+ * @notice Reference implementation of DR Fee Mutualizer with exchange token-based agreement management and meta-transaction support
  *
- * @notice This is the interface for the Dispute Resolver fee mutualizers.
+ * The ERC-165 identifier for this interface is: 0xfde8ce04
  *
- * The ERC-165 identifier for this interface is: 0x391b17cd
+ * @dev This contract provides dispute resolver fee mutualization with configurable agreements per seller + exchange token + dispute resolver.
+ *      Each seller can have agreements for different exchange tokens and dispute resolvers. Universal agreements can be created by setting disputeResolverId=0.
  */
 interface IDRFeeMutualizerClient is IDRFeeMutualizer {
     struct Agreement {
-        address sellerAddress;
+        uint256 maxAmountPerTx;
+        uint256 maxAmountTotal;
+        uint256 timePeriod;
+        uint256 premium; // Premium amount to be paid by seller
+        address tokenAddress; // Token address for the agreement (address(0) for native currency)
+        bool refundOnCancel; // Whether premium is refunded on cancellation
+        bool isVoided;
+        uint256 startTime; // When the agreement becomes active (0 if not activated)
+        uint256 totalMutualized; // Total amount mutualized so far
+        uint256 sellerId; // The seller ID for this agreement
+    }
+
+    struct FeeInfo {
         address token;
-        uint256 maxMutualizedAmountPerTransaction;
-        uint256 maxTotalMutualizedAmount;
-        uint256 premium;
-        uint128 startTimestamp;
-        uint128 endTimestamp;
-        bool refundOnCancel;
+        uint256 amount;
     }
 
-    struct AgreementStatus {
-        bool confirmed;
-        bool voided;
-        uint256 outstandingExchanges;
-        uint256 totalMutualizedAmount;
-    }
-
-    event AgreementCreated(address indexed sellerAddress, uint256 indexed agreementId, Agreement agreement);
-    event AgreementConfirmed(address indexed sellerAddress, uint256 indexed agreementId);
-    event AgreementVoided(address indexed sellerAddress, uint256 indexed agreementId);
-    event FundsDeposited(address indexed tokenAddress, uint256 amount, address indexed depositor);
-    event FundsWithdrawn(address indexed tokenAddress, uint256 amount);
-
-    /**
-     * @notice Stores a new agreement between mutualizer and seller. Only contract owner can submit an agreement,
-     * however it becomes valid only after seller confirms it by calling payPremium.
-     *
-     * Emits AgreementCreated event if successful.
-     *
-     * Reverts if:
-     * - caller is not the contract owner
-     * - max mutualized amount per transaction is greater than max total mutualized amount
-     * - max mutualized amount per transaction is 0
-     * - end timestamp is not greater than start timestamp
-     * - end timestamp is not greater than current block timestamp
-     *
-     * @param _agreement - a fully populated agreement object
-     */
-    function newAgreement(Agreement calldata _agreement) external;
+    // Events
+    event FundsDeposited(address indexed depositor, address indexed tokenAddress, uint256 amount);
+    event FundsWithdrawn(address indexed to, address indexed tokenAddress, uint256 amount);
+    event AgreementCreated(
+        uint256 agreementId,
+        uint256 indexed sellerId,
+        address indexed tokenAddress,
+        uint256 indexed disputeResolverId
+    );
+    event AgreementActivated(uint256 indexed agreementId, uint256 indexed sellerId);
+    event AgreementVoided(uint256 indexed agreementId, bool premiumRefunded, uint256 amountRefunded);
 
     /**
-     * @notice Pay the premium for the agreement and confirm it.
-     *
-     * Emits AgreementConfirmed event if successful.
-     *
-     * Reverts if:
-     * - agreement does not exist
-     * - agreement is already confirmed
-     * - agreement is voided
-     * - agreement expired
-     * - token is native and sent value is not equal to the agreement premium
-     * - token is ERC20, but some native value is sent
-     * - token is ERC20 and sent value is not equal to the agreement premium
-     * - token is ERC20 and transferFrom fails
-     *
-     * @param _agreementId - a unique identifier of the agreement
-     */
-    function payPremium(uint256 _agreementId) external payable;
-
-    /**
-     * @notice Void the agreement.
-     *
-     * Emits AgreementVoided event if successful.
+     * @notice Deposits funds to the mutualizer pool
+     * @param _tokenAddress The token address (address(0) for native currency)
+     * @param _amount The amount to deposit (for native currency msg.value == amount)
+     * @dev For native currency deposits, the amount parameter should equal to msg.value
      *
      * Reverts if:
-     * - agreement does not exist
-     * - caller is not the contract owner or the seller
-     * - agreement is voided already
-     * - agreement expired
-     *
-     * @param _agreementId - a unique identifier of the agreement
-     */
-    function voidAgreement(uint256 _agreementId) external;
-
-    /**
-     * @notice Deposit funds to the mutualizer. Funds are used to cover the DR fees.
-     *
-     * Emits FundsDeposited event if successful.
-     *
-     * Reverts if:
-     * - token is native and sent value is not equal to _amount
-     * - token is ERC20, but some native value is sent
-     * - token is ERC20 and sent value is not equal to _amount
-     * - token is ERC20 and transferFrom fails
-     *
-     * @param _tokenAddress - the token address (use 0x0 for native token)
-     * @param _amount - amount to transfer
+     * - Deposits are restricted and caller is not owner
+     * - amount is 0
+     * - amount is not equal to msg.value for native currency
+     * - msg.value > 0 for ERC20 tokens
+     * - ERC20 or native currency transfer fails
      */
     function deposit(address _tokenAddress, uint256 _amount) external payable;
 
     /**
-     * @notice Withdraw funds from the mutualizer.
-     *
-     * Emits FundsWithdrawn event if successful.
+     * @notice Withdraws funds from the mutualizer pool
+     * @param _tokenAddress The token address (address(0) for native currency)
+     * @param _amount The amount to withdraw
+     * @param _to The address to withdraw to
+     * @dev Only callable by the contract owner
      *
      * Reverts if:
-     * - caller is not the mutualizer owner
-     * - amount exceeds available balance
-     * - token is ERC20 and transferFrom fails
-     *
-     * @param _tokenAddress - the token address (use 0x0 for native token)
-     * @param _amount - amount to transfer
+     * - Caller is not owner
+     * - amount is 0
+     * - to is zero address
+     * - Pool balance is insufficient
+     * - ERC20 or native currency transfer fails
      */
-    function withdraw(address _tokenAddress, uint256 _amount) external;
+    function withdraw(address _tokenAddress, uint256 _amount, address payable _to) external;
 
     /**
-     * @notice Returns agreement details and status for a given agreement id.
+     * @notice Creates a new agreement between seller and dispute resolver for a specific exchange token
+     * @param _sellerId The seller ID
+     * @param _tokenAddress The exchange token address for the agreement (address(0) for native currency)
+     * @param _disputeResolverId The dispute resolver ID (0 for "any dispute resolver" i.e. universal agreement)
+     * @param _maxAmountPerTx The maximum mutualized amount per transaction
+     * @param _maxAmountTotal The maximum total mutualized amount
+     * @param _timePeriod The time period for the agreement (in seconds)
+     * @param _premium The premium amount to be paid by seller
+     * @param _refundOnCancel Whether premium is refunded on cancellation
+     * @return agreementId The ID of the created agreement
+     * @dev Only callable by the contract owner. Prevents duplicate active agreements for the same seller, token and dispute resolver.
+     *      Universal agreements can be created by setting disputeResolverId=0 (covers all dispute resolvers for that token).
      *
      * Reverts if:
-     * - agreement does not exist
-     *
-     * @param _agreementId - a unique identifier of the agreement
-     * @return agreement - agreement details
-     * @return status - agreement status
+     * - Caller is not owner
+     * - sellerId is 0
+     * - maxAmountPerTx is 0
+     * - maxAmountTotal < maxAmountPerTx
+     * - timePeriod is 0
+     * - Active agreement exists for same seller, exchange token and dispute resolver
      */
-    function getAgreement(
-        uint256 _agreementId
-    ) external view returns (Agreement memory agreement, AgreementStatus memory status);
+    function newAgreement(
+        uint256 _sellerId,
+        address _tokenAddress,
+        uint256 _disputeResolverId,
+        uint256 _maxAmountPerTx,
+        uint256 _maxAmountTotal,
+        uint256 _timePeriod,
+        uint256 _premium,
+        bool _refundOnCancel
+    ) external returns (uint256 agreementId);
 
     /**
-     * @notice Returns agreement id, agreement details and status for given seller and token.
+     * @notice Voids an existing agreement
+     * @param _agreementId The ID of the agreement to void
+     * @dev Can be called by the seller or owner (if refundOnCancel is true). Calculates time-based refunds.
      *
      * Reverts if:
-     * - agreement does not exist
-     * - agreement is not confirmed yet
-     *
-     * @param _seller - the seller address
-     * @param _token - the token address (use 0x0 for native token)
-     * @return agreementId - a unique identifier of the agreement
-     * @return agreement - agreement details
-     * @return status - agreement status
+     * - agreementId is invalid
+     * - Agreement is already voided
+     * - Caller is not authorized
+     * - ERC20 or native currency transfer fails
+     * - Seller not found
      */
-    function getConfirmedAgreementBySellerAndToken(
-        address _seller,
-        address _token
-    ) external view returns (uint256 agreementId, Agreement memory agreement, AgreementStatus memory status);
+    function voidAgreement(uint256 _agreementId) external;
+
+    /**
+     * @notice Pays premium to activate an agreement
+     * @param _agreementId The ID of the agreement to activate
+     * @param _sellerId The ID of the seller
+     * @dev For native currency agreements, send the premium as msg.value. For ERC20, approve the token first.
+     *
+     * Reverts if:
+     * - agreementId is invalid
+     * - sellerId does not match the agreement's sellerId
+     * - Agreement is already active
+     * - Agreement is voided
+     * - msg.value != premium for native currency
+     * - msg.value > 0 for ERC20 tokens
+     * - ERC20 or native currency transfer fails
+     */
+    function payPremium(uint256 _agreementId, uint256 _sellerId) external payable;
+
+    /**
+     * @notice Gets agreement details
+     * @param _agreementId The ID of the agreement
+     * @return agreement The details of the agreement
+     * @dev Reverts if agreementId is invalid
+     *
+     * Reverts if:
+     * - agreementId is 0 or >= agreements.length
+     */
+    function getAgreement(uint256 _agreementId) external view returns (Agreement memory);
+
+    /**
+     * @notice Gets agreement ID for a seller, token and dispute resolver
+     * @param _sellerId The seller ID
+     * @param _tokenAddress The exchange token address
+     * @param _disputeResolverId The dispute resolver ID (0 for universal agreement)
+     * @return agreementId The ID of the agreement (0 if not found)
+     * @dev Checks for both specific dispute resolver agreements and universal agreements (disputeResolverId = 0).
+     */
+    function getAgreementId(
+        uint256 _sellerId,
+        address _tokenAddress,
+        uint256 _disputeResolverId
+    ) external view returns (uint256);
 }
 ```
 
 #### BosonTypes
-`Offer` is extended with an additional field
-
-```diff solidity
-struct Offer {
-    uint256 id;
-    uint256 sellerId;
-    uint256 price;
-    uint256 sellerDeposit;
-    uint256 buyerCancelPenalty;
-    uint256 quantityAvailable;
-    address exchangeToken;
-    string metadataUri;
-    string metadataHash;
-    bool voided;
-+   address feeMutualizer;
-}
-```
-
 `DisputeResolutionTerms` is extended with an additional field
 
 ```diff solidity
@@ -312,12 +285,22 @@ struct DisputeResolutionTerms {
     uint256 escalationResponsePeriod;
     uint256 feeAmount;
     uint256 buyerEscalationDeposit;
-+   address feeMutualizer;
++   address payable mutualizerAddress;
 }
 ```
 
 #### IBosonOfferHandler and IBosonOrchestrationHandler
-Although definitions of methods that create an offer do not change, the type of input parameter `Offer offer` changes. As a consequence, the signatures of all methods that accept `Offer` also change. Affected methods are
+Since mutualizer address can be specified during the offer creation, all methods that create an offer must accept an additional parameter. Instead of making `mutualizerAddress` as a new parameter, a new struct is introduced:  
+```solidity
+struct DRParameters {
+    uint256 disputeResolverId;
+    address payable mutualizerAddress;
+}
+```
+
+It includes all dispute resolution relevant input parameters, including the existing `disputeResolverId`. In all methods that create an offer, `uint256 _disputeResolverId` is replaced by the `BosonTypes.DRParameters calldata _drParameters`.  
+
+Affected methods are
 
 - createOffer
 - createOfferBatch
@@ -357,7 +340,7 @@ Still, this specification has an impact on previous protocol versions, since the
 
 ## Implementation
 
-WIP implementation is available [here](https://github.com/bosonprotocol/boson-protocol-contracts/pull/622).
+WIP implementation is available [here](https://github.com/bosonprotocol/boson-protocol-contracts/pull/1001).
   
 ## Copyright waiver & license
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
