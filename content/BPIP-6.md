@@ -3,7 +3,7 @@ bpip: 6
 title: Multiple collections per seller
 author: Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/15
-status: Review
+status: Final
 created: 2023-03-13
 ---
 

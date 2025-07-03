@@ -3,7 +3,7 @@ bpip: 5
 title: Flexible royalties
 author: Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/13
-status: Review
+status: Final
 created: 2023-03-13
 ---
 
