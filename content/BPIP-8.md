@@ -11,15 +11,15 @@ created: 2023-06-02
 This proposal describes a minimal interface to support mutualization of dispute resolver fees.
 
 ## Motivation
-Dispute resolver fee is paid for the service provided by the Dispute resolver. The simplest approach is that either seller or buyer pays it, but none of them is unsuitable:
+Dispute resolver fee is paid for the service provided by the Dispute resolver. The simplest approach is that either seller or buyer pays it, but none of them is suitable:
 - If the seller has contributed towards the fee, a buyer is unilaterally able to cause the seller a loss by calling `escalate`.
 - If the buyer has contributed towards the fee, the Buyer is discouraged from calling `escalate` because that action will incur them a cost.
 
-A solution to this problem is to mutualize the dispute resolution fees (DRF) by creating an open insurance market that covers the fee when dispute resolution services are sought.
+A solution to this problem is to mutualize the dispute resolution fees (DRF) by creating an open market that covers the fee when dispute resolution services are sought.
 It's possible to insure either buyers or sellers. In both cases, they pay a premium to the mutualizer, which then bears the cost of escalated dispute resolution if it comes to it.
 Given that the sellers are expected to be permanently present in the system, while some buyers will be only one-time users, it makes more sense to mutualize across the sellers.
 
-Mutualizer is a contract external to the protocol. It can specify arbitrary insurance policies and can implement custom business logic.
+Mutualizer is a contract external to the protocol. It can specify arbitrary policies and can implement custom business logic.
 To be compatible with the protocol it must implement the methods to send the DR fee to the protocol when requested and must be able to receive the outcome of the dispute resolution.
 
 This BPIP proposes the following interfaces:
