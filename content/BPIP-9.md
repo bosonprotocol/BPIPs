@@ -51,7 +51,7 @@ This change will extend the protocol usefulness. Often the buyers are seeking fo
      * - Buyer cancel penalty is greater than price
 -    * - Collection does not exist
 +    * - Collection does not exist if offer is created by the seller
-+    * - Collection id os different from 0 if offer is created by the buyer
++    * - Collection id is different from 0 if offer is created by the buyer
      * - When agent id is non zero:
      *   - If Agent does not exist
      * - If the sum of agent fee amount and protocol fee amount is greater than the offer fee limit determined by the protocol
@@ -64,7 +64,7 @@ This change will extend the protocol usefulness. Often the buyers are seeking fo
 +      * - Royalty recipient is not on seller's allow list
 +      * - Royalty percentage is less than the value decided by the admin
 +      * - Total royalty percentage is more than max royalty percentage
-+    * If the buyer is creating an offer and roylties are set.
++    * If the buyer is creating an offer and royalties are set.
      *
      * @param _offer - the fully populated struct with offer id set to 0x0 and voided set to false
      * @param _offerDates - the fully populated offer dates struct
@@ -159,7 +159,7 @@ Note: `commitToConditionalOffer` does is not changed in this proposal, since con
 -    * - Buyer address is zero
 -    * - Buyer account is inactive
 +    * - Committer address is zero
-+    * - Committer account is inactive
++    * - Committer account is deactivated
      * - Buyer is token-gated (conditional commit requirements not met or already used)
 -    * - Offer price is in native token and caller does not send enough
 -    * - Offer price is in some ERC20 token and caller also sends native currency
@@ -198,7 +198,7 @@ Note: `commitToConditionalOffer` does is not changed in this proposal, since con
      * - Offer has expired
      * - Offer is not yet available for commits
 +    * - Committer address is zero
-+    * - Committer account is inactive
++    * - Committer account is deactivated
      * - Buyer is token-gated (conditional commit requirements not met or already used)
      * - Any reason that PriceDiscoveryBase fulfilOrder reverts. See PriceDiscoveryBase.fulfilOrder
      * - Any reason that ExchangeHandler onPremintedVoucherTransfer reverts. See ExchangeHandler.onPremintedVoucherTransfer
