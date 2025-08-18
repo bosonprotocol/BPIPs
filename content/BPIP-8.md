@@ -3,7 +3,7 @@ bpip: 8
 title: Dispute resolver fee mutualizer
 authors: Aditya Asgaonkar, Justin Banon, Mischa Tuffield, Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/21
-status: Draft
+status: Review
 created: 2023-06-02
 ---
 
@@ -28,7 +28,7 @@ This BPIP proposes the following interfaces:
 
 The interactions between mutualizer, seller and protocol are presented in the following diagram:
 
-![Pre-minted Vouchers Interactions Diagram](./assets/bpip-8/Mutualizer-diagram.png "Mutualizer Sequences Diagram")
+![Pre-minted Vouchers Interactions Diagram](./assets/bpip-8/Mutualizer-diagram.jpg "Mutualizer Sequences Diagram")
 
 1. Seller and mutualizer first agree on mutualization and store the information on the mutualizer contract.
 2. When the buyer commits to an offer, the DR fee is pulled from the mutualizer and locked in the protocol
@@ -46,14 +46,9 @@ The interactions between mutualizer, seller and protocol are presented in the fo
  * @title IDRFeeMutualizer
  * @notice Interface for dispute resolver fee mutualization
  *
- * The ERC-165 identifier for this interface is: 0x1ff4f3df
- *
- * @dev This interface defines the core functionality for mutualizing dispute resolver fees
+ * The ERC-165 identifier for this interface is: 0x1e0b3a78
  */
-interface IDRFeeMutualizer {
-    event DRFeeProvided(uint256 indexed exchangeId, uint256 indexed sellerId, uint256 feeAmount);
-    event DRFeeReturned(uint256 indexed exchangeId, uint256 originalFeeAmount, uint256 returnedAmount);
-    
+interface IDRFeeMutualizer is IERC165 {
     /**
      * @notice Checks if a seller is covered for a specific DR fee
      * @param _sellerId The seller ID
@@ -80,6 +75,8 @@ interface IDRFeeMutualizer {
      * @return success True if the request was successful, false otherwise
      * @dev Only callable by the Boson protocol. Returns false if seller is not covered.
      *
+     * Emits a {DRFeeProvided} event if successful.
+     *
      * Reverts if:
      * - Caller is not the Boson protocol
      * - feeAmount is 0
@@ -99,6 +96,8 @@ interface IDRFeeMutualizer {
      * @param _exchangeId The exchange ID
      * @param _feeAmount The amount being returned (0 means protocol kept all fees)
      * @dev Only callable by the Boson protocol. For native currency, feeAmount must equal msg.value.
+     *
+     * Emits a {DRFeeReturned} event.
      *
      * Reverts if:
      * - Caller is not the Boson protocol
