@@ -3,7 +3,7 @@ bpip: 9
 title: Buyer initiated exchange
 authors: Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/36
-status: Draft
+status: REview
 created: 2025-07-02
 ---
 
@@ -64,7 +64,11 @@ This change will extend the protocol usefulness. Often the buyers are seeking fo
 +      * - Royalty recipient is not on seller's allow list
 +      * - Royalty percentage is less than the value decided by the admin
 +      * - Total royalty percentage is more than max royalty percentage
-+    * If the buyer is creating an offer and royalties are set.
++    * If the buyer is creating an offer and
++      * - Royalties are set.
++      * - Seller's collection is chosen
++      * - Mutualizer address is set
++      * - Price type is not static
      *
      * @param _offer - the fully populated struct with offer id set to 0x0 and voided set to false
      * @param _offerDates - the fully populated offer dates struct
@@ -120,7 +124,7 @@ This change will extend the protocol usefulness. Often the buyers are seeking fo
 
 #### IBosonExchangeEvents
 A new event is introduced. It is emitted when the seller commits to a buyer-created offer.
-````diff solidity
+```diff solidity
 +    event SellerCommitted(
 +        uint256 indexed offerId,
 +        uint256 indexed sellerId,
@@ -130,8 +134,7 @@ A new event is introduced. It is emitted when the seller commits to a buyer-crea
 +        address executedBy
 +    );
 
-````
-Note: instead of having `SellerCommitted` and `BuyerCommitted` events, it could be merged into a single event containing both buyer and seller id.
+```
 
 #### IBosonExchangeHandler
 
@@ -178,6 +181,45 @@ Note: `commitToConditionalOffer` does is not changed in this proposal, since con
      */
 -   function commitToOffer(address payable _buyer, uint256 _offerId) external payable;
 +   function commitToOffer(address payable _committer, uint256 _offerId) external payable;
+```
+
+A new method is added to allow sellers to commit to a buyer-initiated offer and at the same time provide the offer parameters that cannot be known by the buyer at offer creation.
+
+```solidity
+    /**
+     * @notice Commits to buyer-created offer with seller-specific parameters.
+     *
+     * Emits a BuyerInitiatedOfferSetSellerParams event if successful.
+     * Emits a SellerCommitted event if successful.
+     * Issues a voucher to the buyer address.
+     *
+     * Reverts if:
+     * - The exchanges region of protocol is paused
+     * - The buyers region of protocol is paused
+     * - The sellers region of protocol is paused
+     * - OfferId is invalid
+     * - Offer has been voided
+     * - Offer has expired
+     * - Offer is not yet available for commits
+     * - Offer's quantity available is zero
+     * - Msg.sender is not a seller assistant or not valid seller
+     * - Offer is not buyer-created
+     * - Collection index is invalid for the seller
+     * - Royalty recipients are not on seller's whitelist
+     * - Royalty percentages are below minimum requirements
+     * - Total royalty percentage exceeds maximum allowed
+     * - Offer exchange token is in native token and caller does not send enough
+     * - Offer exchange token is in some ERC20 token and caller also sends native currency
+     * - Contract at token address does not support ERC20 function transferFrom
+     * - Calling transferFrom on token fails for some reason (e.g. protocol is not approved to transfer)
+     * - Received ERC20 token amount differs from the expected value
+     * - Seller has less funds available than sellerDeposit
+     * - Buyer has less funds available than item price
+     *
+     * @param _offerId - the id of the offer to commit to
+     * @param _sellerParams - the seller-specific parameters (collection index, royalty info, mutualizer address)
+     */
+    function commitToBuyerOffer(uint256 _offerId, BosonTypes.SellerOfferParams calldata _sellerParams) external payable;
 ```
 
 #### IBosonPriceDiscoveryHandler
@@ -228,14 +270,16 @@ This specification does not break backward compatibility. It should work for bot
 * Create offer
   * Store the information who created the offer. The existing offers should default to "seller"
 * Commit to offer
-  * Accept committer address, which can be either a buyer or a seller
   * If seller-created offer:
+    * Accept buyer address, which can be either a buyer or a seller
     * Check that seller has at least the `sellerDeposit` in available funds end encumber them
-    * Validate that the buyer paid the `price`
+    * Validate that the caller paid the `price`
   * If buyer-created offer:
+    * Caller must be the seller (i.e. commit on seller's behalf is not allowed)
     * Check that buyer has at least the `price` in available funds end encumber them
     * Validate that the seller paid the `sellerDeposit`
     * Set `sellerId` parameter of the offer
+    * If seller provided the parameters for `mutualizer`, `collectionIndex` or `royaltyInfo`, they should be validated in the same way as they are for seller-crated offers.
   * All existing validations in commit to offer should remain in place
   * If any validation fails, revert
 * Deposit funds
