@@ -3,7 +3,7 @@ bpip: 10
 title: Off-chain Listing Phase
 authors: Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/38
-status: Draft
+status: Review
 created: 2025-07-02
 ---
 
@@ -25,6 +25,21 @@ The protocol's guarantees are preserved, since the buyer still gets the guarante
 ![Off-chain Listing and Negotiation](./assets/bpip-10/create-offer-and-commit.png "Off-chain Listing and Negotiation")
 
 ## Specification
+#### BosonTypes
+A new struct is introduced to make handling of signed offers easier.
+``` solidity
+    struct FullOffer {
+        Offer offer;
+        OfferDates offerDates;
+        OfferDurations offerDurations;
+        DRParameters drParameters;
+        Condition condition;
+        uint256 agentId;
+        uint256 feeLimit;
+        bool useDepositedFunds;
+    }
+```
+
 #### IBosonExchangeHandler
 
 A new method that combines `createOffer` and `commitToOffer` is added to the protocol.
@@ -32,8 +47,9 @@ There is no distinction between static offer and price-discovery offer - it is i
 When this offer is created the buyer gets `quantity` of rNFTs.
 
 ```diff solidity
-     /**
-     * @notice Creates an offer.
+      /**
+     * @notice Creates an offer and commits to it immediately.
+     * The caller is the committer and must provide the offer creator's signature.
      *
      * Emits an OfferCreated, FundsEncumbered, BuyerCommitted and SellerCommitted event if successful.
      *
@@ -55,8 +71,7 @@ When this offer is created the buyer gets `quantity` of rNFTs.
      * - Dispute resolver does not accept fees in the exchange token
      * - Buyer cancel penalty is greater than price
      * - Collection does not exist
-     * - When agent id is non zero:
-     *   - If Agent does not exist
+     * - When agent id is non zero and the agent does not exist
      * - If the sum of agent fee amount and protocol fee amount is greater than the offer fee limit determined by the protocol
      * - If the sum of agent fee amount and protocol fee amount is greater than fee limit set by seller
      * - Royalty recipient is not on seller's allow list
@@ -64,52 +79,57 @@ When this offer is created the buyer gets `quantity` of rNFTs.
      * - Total royalty percentage is more than max royalty percentage
      * - Not enough funds can be encumbered
      *
-     * @param _offer - the fully populated struct with offer id set to 0x0 and voided set to false
-     * @param _offerDates - the fully populated offer dates struct
-     * @param _offerDurations - the fully populated offer durations struct
-     * @param _drParameters - the id of chosen dispute resolver (can be 0) and mutualizer address (0 for self-mutualization)
-     * @param _agentId - the id of agent
-     * @param _feeLimit - the maximum fee that seller is willing to pay per exchange (for static offers)
-     * @param _otherCommitter - the address of the other party
+     * @param _fullOffer - the fully populated struct containing offer, offer dates, offer durations, dispute resolution parameters, condition, agent id and fee limit
+     * @param _offerCreator - the address of the other party
+     * @param _committer - the address of the committer (buyer for seller-created offers, seller for buyer-created offers)
      * @param _signature - signature of the other party. If the signer is EOA, it must be ECDSA signature in the format of (r,s,v) struct, otherwise, it must be a valid ERC1271 signature.
+     * @param _conditionalTokenId - the token id to use for the conditional commit, if applicable
+     * @param _sellerParams - the seller-specific parameters (collection index, royalty info, mutualizer address), if applicable
      */
     function createOfferAndCommit(
-        BosonTypes.Offer memory _offer,
-        BosonTypes.OfferDates calldata _offerDates,
-        BosonTypes.OfferDurations calldata _offerDurations,
-        BosonTypes.DRParameters calldata _drParameters,
-        uint256 _agentId,
-        uint256 _feeLimit,
-        address _otherCommitter,
-        bytes calldata _signature
-    ) external;
+        BosonTypes.FullOffer calldata _fullOffer,
+        address _offerCreator,
+        address payable _committer,
+        bytes calldata _signature,
+        uint256 _conditionalTokenId,
+        BosonTypes.SellerOfferParams calldata _sellerParams
+    ) external payable;
+```
 
-     /**
-     * @notice Voids an offer.
+#### IBosonOfferHandler
+If either seller or buyer signed the offer off-chain, but later decided to opt out of the offer, and the other party have not used it yer, the signer can void the offer and makes in unfulfillable.
+
+```solidity
+/**
+     * @notice Voids a non-listed offer. (offers used in `createOfferAndCommit`)
+     * It prevents the offer from being used in future exchanges even if it was already signed.
      *
-     * Emits an OfferVoided, FundsEncumbered, BuyerCommitted and SellerCommitted event if successful.
+     * Emits a NonListedOfferVoided event if successful.
      *
      * Reverts if:
      * - The offers region of protocol is paused
-     * - The caller is not one of the committers
+     * - Caller is not the assistant of the offer
+     * - Offer has already been voided
      *
-     * @param _offer - the fully populated struct with offer id set to 0x0 and voided set to false
-     * @param _offerDates - the fully populated offer dates struct
-     * @param _offerDurations - the fully populated offer durations struct
-     * @param _drParameters - the id of chosen dispute resolver (can be 0) and mutualizer address (0 for self-mutualization)
-     * @param _agentId - the id of agent
-     * @param _feeLimit - the maximum fee that seller is willing to pay per exchange (for static offers)
-     * @param _otherCommitter - the address of the other party
+     * @param _fullOffer - the fully populated struct containing offer, offer dates, offer durations, dispute resolution parameters, condition, agent id and fee limit
      */
-    function voidOffer(
-        BosonTypes.Offer memory _offer,
-        BosonTypes.OfferDates calldata _offerDates,
-        BosonTypes.OfferDurations calldata _offerDurations,
-        BosonTypes.DRParameters calldata _drParameters,
-        uint256 _agentId,
-        uint256 _feeLimit,
-        address _otherCommitter
-    ) external;
+    function voidNonListedOffer(BosonTypes.FullOffer calldata _fullOffer) external;
+
+    /**
+     * @notice Voids multiple non-listed offers. (offers used in `createOfferAndCommit`)
+     * It prevents the offers from being used in future exchanges even if they were already signed.
+     *
+     * Emits NonListedOfferVoided events if successful.
+     *
+     * Reverts if:
+     * - The number of elements in offers, offerDates, offerDurations, disputeResolverIds, agentIds and feeLimits do not match
+     * - The offers region of protocol is paused
+     * - Caller is not the authorized to void the offer
+     * - Offer has already been voided
+     *
+     * @param _fullOffers - the list fully populated structs containing offer, offer dates, offer durations, dispute resolution parameters, condition, agent id and fee limit
+     */
+    function voidNonListedOfferBatch(BosonTypes.FullOffer[] calldata _fullOffers) external;
 ```
 
 ## Rationale
@@ -123,16 +143,21 @@ If one of the committers already agreed on an exchange (i.e. they signed the agr
 This specification does not break backward compatibility.
 
 ## Implementation
-* Add another storage variable `mapping(bytes32=>bool) isOfferVoided`
+* Add another storage variable `mapping(bytes32=>uint256) offerIdByHash`
 * Create offer and commit
+  * Calculate hash of offer parameters and caller's address. 
+  * If offer was validated already:
+     * If offer was voided, revert
+     * Continue to `commitToOffer` step.
+  * Validate signature validity (ECSDA signature for EOA or EIP1271 contract signature if not EOA). If validation fails, revert.
   * Perform all the validations done in `createOffer`
   * Perform all the validations done in `commitToOffer`
-  * Calculate hash of offer parameters and caller's address. Validate signature validity (ECSDA signature for EOA or EIP1271 contract signature if not EOA). If validation fails, revert.
-  * If `isOfferVoided[hash]`, revert.
-  * In `commitToOffer` the party that created the offer needs to provide its payment upfront. In this `createOfferAndCommit` all payments are encumbered at the same time. Both parties must approve protocol to transfer the exchange token. If the exchange token is native, the other party must approved a wrapped version of the native token.
+  * In `commitToOffer` the party that created the offer needs to provide its payment upfront. In this `createOfferAndCommit` the creator can choose:
+    * To use its available funds (already in the protocol). This must be used if the exchange token is the native token and amount to be encumbered is greater than 0.
+    * To approve the protocol to transfer the funds, which are encumbered at the same time as the callers. 
 * Void offer
   * Calculate hash of offer parameters and other committer's address. Validate signature validity (ECSDA signature for EOA or EIP1271 contract signature if not EOA). If validation fails, revert.
-  * Set `isOfferVoided[hash]=true`
+  * Set `offerIdByHash[hash]=VOIDED_OFFER_ID`, where `VOIDED_OFFER_ID` is max value of uint256 type.
 
 ### Security considerations
 
