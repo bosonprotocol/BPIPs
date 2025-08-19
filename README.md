@@ -24,5 +24,6 @@ As these are vastly different changes, the process for each is a bit different. 
 * [BPIP-6](/content/BPIP-6.md), Multiple collections per seller
 * [BPIP-7](/content/BPIP-7.md), Sequential commit
 * [BPIP-8](/content/BPIP-8.md), DR Fee Mutualizer
+* [BPIP-9](/content/BPIP-9.md), Buyer initiated exchange
 
 _Also check [PRs](https://github.com/bosonprotocol/BPIPs/pulls) to see proposals in progress._
