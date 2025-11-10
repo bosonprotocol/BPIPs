@@ -178,8 +178,11 @@ interface IBosonPriceDiscovery is IERC721Receiver {
 
 ## Examples: 
 
-In all examples, the seller must first create an offer and premint the desired number of vouchers. These can be then plugged into a price discovery mechanism of seller's choice.
+In all examples, the seller must first create an offer and premint the desired number of vouchers. These can be then plugged into a price discovery mechanism of seller's choice.  
 
+For a reference implementation of examples refer to the [integration tests](https://github.com/bosonprotocol/boson-protocol-contracts/tree/main/test/integration/price-discovery), the [wrapper examples](https://github.com/bosonprotocol/boson-protocol-contracts/tree/main/contracts/example) and the [OpenSea case study](./assets/bpip-4/OpenSea%20+%20Boson%20Price%20Discovery.pdf).
+
+Steps:
 1. A seller creates an Offer in Boson Protocol (BP)
 2. The seller funds the Seller Pool
 3. The seller preMints the offer voucher
@@ -265,7 +268,7 @@ This proposed improvement to the protocol is fully backward compatible, we would
 
 All of the methods described here would be compatible with the current Boson Vouchers. 
 
-### Security considerations
+## Security considerations
 
 Security considerations were originally described for [BPIP-7](BPIP-7.md), but they apply to general price discovery as well. They are available in [this document](./assets/../assets/bpip-7/Sequential%20Commit.pdf).
 
