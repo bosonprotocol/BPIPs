@@ -3,7 +3,7 @@ bpip: 10
 title: Off-chain Listing Phase
 authors: Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/38
-status: Review
+status: Final
 created: 2025-07-02
 ---
 

@@ -3,7 +3,7 @@ bpip: 9
 title: Buyer initiated exchange
 authors: Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/36
-status: REview
+status: Final
 created: 2025-07-02
 ---
 

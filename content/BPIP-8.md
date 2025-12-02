@@ -3,7 +3,7 @@ bpip: 8
 title: Dispute resolver fee mutualizer
 authors: Aditya Asgaonkar, Justin Banon, Mischa Tuffield, Klemen Zajc
 discussions-to: https://github.com/bosonprotocol/BPIPs/discussions/21
-status: Review
+status: Final
 created: 2023-06-02
 ---
 
