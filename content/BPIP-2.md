@@ -4,7 +4,7 @@ title: Kleros Integration as Dispute Resolver
 author: Artem Brazhnikov
 discussions-to: https://github.com/bosonprotocol/BPIPs/issues/10
 type: protocol
-status: Review
+status: Stagnant
 created: 2022-12-22
 ---
 
