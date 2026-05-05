@@ -26,6 +26,7 @@ As these are vastly different changes, the process for each is a bit different. 
 * [BPIP-8](/content/BPIP-8.md), DR Fee Mutualizer
 * [BPIP-9](/content/BPIP-9.md), Buyer initiated exchange
 * [BPIP-10](/content/BPIP-10.md), Off-chain Listing Phase
+* [BPIP-12](/content/BPIP-12.md), Token-Transfer Authorization in Metatransactions
 * [BPIP-13](/content/BPIP-13.md), Atomic Commit-and-Redeem
 
 _Also check [PRs](https://github.com/bosonprotocol/BPIPs/pulls) to see proposals in progress._
