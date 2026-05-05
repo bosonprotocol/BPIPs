@@ -129,7 +129,7 @@ function createOfferCommitAndRedeem(
 
 ### Metatransaction support
 
-All three methods are callable via the metatransaction with authorized token transfer mechanism ([BPIP12](BPIP-12.md). The authorization queue layouts are:
+All three methods are callable via the metatransaction with authorized token transfer mechanism ([BPIP12](BPIP-12.md)). The authorization queue layouts are:
 
 | Method | Auth queue |
 |--------|-----------|
