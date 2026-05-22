@@ -46,15 +46,14 @@ A new entry point is added alongside the existing `executeMetaTransaction`.
  *         token-transfer authorization queue that funds-pulling functions
  *         can consume in lieu of an ERC-20 allowance.
  *
- * The protocol parks `_tokenTransferAuthorization` in transient storage for
- * the duration of the transaction. The payload is `abi.encode(bytes[] queue)`
- * where each entry is one of:
+ * Each entry in `_tokenTransferAuthorization` is consumed in order by
+ * transferFundsIn calls made during execution of `_functionSignature`. Entries
+ * beyond the number of transferFundsIn calls are ignored; the queue is cleared
+ * from transient storage at transaction end. Each element is one of:
  *   - empty bytes ("0x") — fall back to safeTransferFrom for this slot
  *     (shortcut for (TokenTransferAuthorizationStrategy.None, "")).
  *   - `abi.encode(BosonTypes.TokenTransferAuthorizationStrategy strategy, bytes data)`
  *     — strategy-specific payload described in the table below.
- * Entries beyond the number of transferFundsIn calls are ignored; the queue is
- * cleared from transient storage at transaction end.
  *
  * Emits MetaTransactionExecuted event if successful.
  *
@@ -74,7 +73,7 @@ A new entry point is added alongside the existing `executeMetaTransaction`.
  * @param _functionSignature - the encoded function call to execute
  * @param _nonce - nonce of the transaction, used to prevent replay attacks
  * @param _signature - meta transaction signature (ECDSA concatenated r,s,v for EOAs; ERC-1271 for contracts)
- * @param _tokenTransferAuthorization - `abi.encode(bytes[] queue)` (see above)
+ * @param _tokenTransferAuthorization - queue of per-transfer authorization entries (see above)
  */
 function executeMetaTransactionWithTokenTransferAuthorization(
     address _userAddress,
@@ -82,7 +81,7 @@ function executeMetaTransactionWithTokenTransferAuthorization(
     bytes calldata _functionSignature,
     uint256 _nonce,
     bytes calldata _signature,
-    bytes calldata _tokenTransferAuthorization
+    bytes[] calldata _tokenTransferAuthorization
 ) external payable returns (bytes memory);
 ```
 
