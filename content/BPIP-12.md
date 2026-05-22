@@ -42,13 +42,19 @@ A new entry point is added alongside the existing `executeMetaTransaction`.
 
 ```solidity
 /**
- * @notice Executes a metatransaction with a queue of per-transfer token-pull authorizations.
+ * @notice Same as `executeMetaTransaction`, but additionally accepts a
+ *         token-transfer authorization queue that funds-pulling functions
+ *         can consume in lieu of an ERC-20 allowance.
  *
- * Each entry in _tokenTransferAuthorization is consumed in order by transferFundsIn calls
- * made during execution of _functionSignature. An empty-bytes entry ("0x") is a
- * fallback marker that causes that transfer slot to fall back to safeTransferFrom
- * (requires a prior on-chain approve). Entries beyond the number of transferFundsIn
- * calls are ignored; the queue is cleared from transient storage at transaction end.
+ * The protocol parks `_tokenTransferAuthorization` in transient storage for
+ * the duration of the transaction. The payload is `abi.encode(bytes[] queue)`
+ * where each entry is one of:
+ *   - empty bytes ("0x") — fall back to safeTransferFrom for this slot
+ *     (shortcut for (TokenTransferAuthorizationStrategy.None, "")).
+ *   - `abi.encode(BosonTypes.TokenTransferAuthorizationStrategy strategy, bytes data)`
+ *     — strategy-specific payload described in the table below.
+ * Entries beyond the number of transferFundsIn calls are ignored; the queue is
+ * cleared from transient storage at transaction end.
  *
  * Emits MetaTransactionExecuted event if successful.
  *
@@ -64,32 +70,27 @@ A new entry point is added alongside the existing `executeMetaTransaction`.
  * - A Permit2 permitTransferFrom call fails
  *
  * @param _userAddress - the address of the user on whose behalf the transaction is being executed
+ * @param _functionName - the name of the function to be executed
  * @param _functionSignature - the encoded function call to execute
  * @param _nonce - nonce of the transaction, used to prevent replay attacks
- * @param _sigR - r part of the metatransaction signer's signature
- * @param _sigS - s part of the metatransaction signer's signature
- * @param _sigV - v part of the metatransaction signer's signature
- * @param _tokenTransferAuthorization - ABI-encoded queue of (TokenTransferAuthorizationStrategy, bytes) pairs,
- *   one per transferFundsIn call in execution order. Each non-empty entry is
- *   abi.encode(TokenTransferAuthorizationStrategy strategy, bytes data) where data
- *   holds the strategy-specific fields described below.
+ * @param _signature - meta transaction signature (ECDSA concatenated r,s,v for EOAs; ERC-1271 for contracts)
+ * @param _tokenTransferAuthorization - `abi.encode(bytes[] queue)` (see above)
  */
 function executeMetaTransactionWithTokenTransferAuthorization(
     address _userAddress,
+    string memory _functionName,
     bytes calldata _functionSignature,
-    bytes32 _nonce,
-    bytes32 _sigR,
-    bytes32 _sigS,
-    uint8 _sigV,
-    bytes[] calldata _tokenTransferAuthorization
-) external payable;
+    uint256 _nonce,
+    bytes calldata _signature,
+    bytes calldata _tokenTransferAuthorization
+) external payable returns (bytes memory);
 ```
 
 #### Per-strategy entry payload (`data` field)
 
 | Strategy | `data` encoding |
 |----------|-----------------|
-| `ERC3009` | `abi.encode(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)` |
+| `ERC3009` | `abi.encode(uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)` |
 | `EIP2612` | `abi.encode(uint256 deadline, uint8 v, bytes32 r, bytes32 s)` |
 | `Permit2` | `abi.encode(uint256 nonce, uint256 deadline, bytes signature)` |
 | `None` / `"0x"` | empty — falls back to `safeTransferFrom` |
@@ -116,7 +117,7 @@ A new internal library manages the queue in transient storage (EIP-1153 / Cancun
 - **Transient storage** — the queue is stored with `tstore` / `tload`, so it is automatically cleared at the end of each transaction with no explicit cleanup required.
 - **ERC-7201-style slot masking** — the last byte of each entry's base slot is zeroed, giving every entry a 256-sub-slot range that cannot overlap with any other entry for typical ERC-3009 payloads (which use 7 sub-slots).
 - **`discardNext()`** — advances the queue head by one without performing any work. Called by `transferFundsIn` for zero-amount transfers and by `createOfferAndCommit` when `useDepositedFunds=true` bypasses the creator pull.
-- **`consumeForTransfer(token, from, amount)`** — pops the next entry, decodes the `(strategy, data)` envelope, and dispatches to the appropriate per-strategy helper. Returns `false` for `None` / empty-bytes entries, causing the caller to fall through to `safeTransferFrom`.
+- **`consumeForTransfer(token, from, to, amount)`** — pops the next entry, decodes the `(strategy, data)` envelope, and dispatches to the appropriate per-strategy helper. Returns `false` for `None` / empty-bytes entries, causing the caller to fall through to `safeTransferFrom`.
 
 ### EIP-2612 diversion guard
 
