@@ -145,7 +145,7 @@ Combining commit and redeem into a single transaction is safe because the commit
 
 To share the internal commit and redeem logic across the new orchestration methods without duplicating code or exceeding the 24 KB facet size limit, two new abstract base contracts are introduced:
 
-- **ExchangeRedeemBase** — contains `redeemVoucherInternal`, `burnVoucher`, `transferTwins`, and `updateNFTRanges`. `ExchangeHandlerFacet` inherits it and overrides `_computeBurnTokenId` to retain pre-2.2.0 voucher token-id compatibility.
+- **ExchangeRedeemBase** — contains `redeemVoucherInternal`, `burnVoucher`, `transferTwins`, and `updateNFTRanges`. Voucher token-id backward compatibility with pre-2.2.0 exchanges is handled directly inside `burnVoucher` using an immutable versioning threshold (`EXCHANGE_ID_2_2_0`): for exchange ids at or above the threshold the token id is `exchangeId | (offerId << 128)`; older ids are passed through unchanged.
 - **ExchangeCommitBase** — contains `commitToOfferInternal`, `verifyOffer`, `authorizeCommit`, `holdsThreshold`/`holdsSpecificToken`, `validateConditionRange`, `handleDRFeeCollection`, and `addSellerParametersToBuyerOffer`. `ExchangeCommitFacet` now inherits it instead of implementing these directly.
 
 `OrchestrationHandlerFacet2` inherits both bases and the three new methods delegate to the shared internals.
@@ -158,12 +158,12 @@ This proposal does not break backward compatibility. All existing methods contin
 ## Implementation
 * Introduce `ExchangeRedeemBase` with the internal redeem logic extracted from `ExchangeHandlerFacet`.
 * Introduce `ExchangeCommitBase` with the internal commit logic extracted from `ExchangeCommitFacet`.
-* `ExchangeHandlerFacet` inherits `ExchangeRedeemBase` and overrides `_computeBurnTokenId` for backward-compatible voucher token-id handling.
+* `ExchangeHandlerFacet` inherits `ExchangeRedeemBase`. Backward-compatible voucher token-id handling is implemented directly in `ExchangeRedeemBase.burnVoucher` via `EXCHANGE_ID_2_2_0` — no override is needed.
 * `ExchangeCommitFacet` inherits `ExchangeCommitBase`.
 * `OrchestrationHandlerFacet2` inherits both `ExchangeCommitBase` and `ExchangeRedeemBase` and adds the three new public methods.
 * Each new method:
-  1. Validates and processes the commit step using shared internals (including offer validation, condition check, fund encumbrance).
-  2. Immediately calls `redeemVoucherInternal` with the same exchange, transferring any twins to `_msgSender()`.
+  1. Validates and processes the commit step using shared internals (including offer validation, condition check, fund encumbrance). The commit is called with `_skipVoucher = true`, so no NFT is minted and `voucherCount` is not incremented.
+  2. Immediately calls `redeemVoucherInternal(_exchangeId, _skipVoucher: true)`, which skips the burn call and buyer-ownership check (no voucher NFT was ever issued), and transfers any twins to `_msgSender()`.
 * Add `OfferCreatorMustBeSeller` to `BosonErrors.sol`.
 
 
